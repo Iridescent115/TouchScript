@@ -1,0 +1,91 @@
+package com.lulucloud.touchscript.core.script
+
+data class IrProgram(
+    val instructions: List<IrInstruction>
+)
+
+sealed interface IrInstruction
+
+sealed interface IrAction : IrInstruction
+
+sealed interface IrControlFlow : IrInstruction
+
+sealed interface IrExpression
+
+data class IrClickAction(
+    val x: IrExpression,
+    val y: IrExpression
+) : IrAction
+
+data class IrLongPressAction(
+    val x: IrExpression,
+    val y: IrExpression,
+    val durationMs: IrExpression
+) : IrAction
+
+data class IrSwipeAction(
+    val startX: IrExpression,
+    val startY: IrExpression,
+    val endX: IrExpression,
+    val endY: IrExpression,
+    val durationMs: IrExpression
+) : IrAction
+
+data class IrSleepAction(
+    val durationMs: IrExpression
+) : IrAction
+
+data class IrLaunchAppAction(
+    val packageName: IrExpression
+) : IrAction
+
+data class IrLogAction(
+    val message: IrExpression
+) : IrAction
+
+data class IrAssignAction(
+    val variableName: String,
+    val expression: IrExpression
+) : IrAction
+
+data object IrBackAction : IrAction
+
+data object IrHomeAction : IrAction
+
+data class IrRepeatInstruction(
+    val count: IrExpression,
+    val body: List<IrInstruction>
+) : IrControlFlow
+
+data class IrIfInstruction(
+    val condition: IrExpression,
+    val thenBranch: List<IrInstruction>,
+    val elseBranch: List<IrInstruction>
+) : IrControlFlow
+
+data class IrNumberLiteral(
+    val value: Long
+) : IrExpression
+
+data class IrBooleanLiteral(
+    val value: Boolean
+) : IrExpression
+
+data class IrStringLiteral(
+    val value: String
+) : IrExpression
+
+data class IrVariableReference(
+    val name: String
+) : IrExpression
+
+data class IrUnaryExpression(
+    val operator: UnaryOperator,
+    val operand: IrExpression
+) : IrExpression
+
+data class IrBinaryExpression(
+    val left: IrExpression,
+    val operator: BinaryOperator,
+    val right: IrExpression
+) : IrExpression
