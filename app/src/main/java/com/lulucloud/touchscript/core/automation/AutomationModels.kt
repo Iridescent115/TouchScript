@@ -45,6 +45,7 @@ interface AutomationExecutor {
 enum class SessionStatus {
     IDLE,
     RUNNING,
+    PAUSED,
     SUCCESS,
     FAILED,
     CANCELLED

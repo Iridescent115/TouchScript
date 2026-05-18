@@ -5,12 +5,18 @@ import android.content.Intent
 import com.lulucloud.touchscript.core.automation.AutomationRunnerService
 
 object AutomationLauncher {
-    fun start(context: Context, scriptName: String, scriptSource: String) {
+    fun showOverlay(context: Context) {
         context.startService(
             Intent(context, AutomationRunnerService::class.java).apply {
-                action = AutomationRunnerService.ACTION_START
-                putExtra(AutomationRunnerService.EXTRA_SCRIPT_NAME, scriptName)
-                putExtra(AutomationRunnerService.EXTRA_SCRIPT_SOURCE, scriptSource)
+                action = AutomationRunnerService.ACTION_SHOW_OVERLAY
+            }
+        )
+    }
+
+    fun hideOverlay(context: Context) {
+        context.startService(
+            Intent(context, AutomationRunnerService::class.java).apply {
+                action = AutomationRunnerService.ACTION_HIDE_OVERLAY
             }
         )
     }

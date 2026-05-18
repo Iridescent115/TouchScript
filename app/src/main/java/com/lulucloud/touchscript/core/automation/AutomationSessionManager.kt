@@ -4,12 +4,15 @@ import com.lulucloud.touchscript.data.repository.ScriptRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
 class AutomationSessionManager(
     private val scriptRepository: ScriptRepository
 ) {
     private val _sessionState = MutableStateFlow(AutomationSessionState())
     private val _logs = MutableStateFlow<List<ExecutionLogEntry>>(emptyList())
+    private val _paused = MutableStateFlow(false)
 
     val sessionState: StateFlow<AutomationSessionState> = _sessionState.asStateFlow()
     val logs: StateFlow<List<ExecutionLogEntry>> = _logs.asStateFlow()
@@ -20,17 +23,47 @@ class AutomationSessionManager(
             scriptName = scriptName,
             startedAt = System.currentTimeMillis()
         )
+        _paused.value = false
         _logs.value = emptyList()
         appendLog("INFO", "开始执行脚本：$scriptName")
     }
 
     suspend fun appendLog(level: String, message: String) {
-        val nextLogs = (_logs.value + ExecutionLogEntry(
+        _logs.value = (_logs.value + ExecutionLogEntry(
             timestamp = System.currentTimeMillis(),
             level = level,
             message = message
         )).takeLast(MAX_LOG_COUNT)
-        _logs.value = nextLogs
+    }
+
+    suspend fun pause() {
+        if (_sessionState.value.status == SessionStatus.RUNNING) {
+            _paused.value = true
+            _sessionState.value = _sessionState.value.copy(status = SessionStatus.PAUSED)
+            appendLog("INFO", "脚本已暂停")
+        }
+    }
+
+    suspend fun resume() {
+        if (_sessionState.value.status == SessionStatus.PAUSED) {
+            _paused.value = false
+            _sessionState.value = _sessionState.value.copy(status = SessionStatus.RUNNING)
+            appendLog("INFO", "脚本继续执行")
+        }
+    }
+
+    suspend fun togglePause() {
+        when (_sessionState.value.status) {
+            SessionStatus.RUNNING -> pause()
+            SessionStatus.PAUSED -> resume()
+            else -> Unit
+        }
+    }
+
+    suspend fun awaitIfPaused() {
+        if (_paused.value) {
+            _paused.filter { paused -> !paused }.first()
+        }
     }
 
     suspend fun completeSuccess(summary: String) {
@@ -48,6 +81,7 @@ class AutomationSessionManager(
     private suspend fun finish(status: SessionStatus, summary: String) {
         val current = _sessionState.value
         val finishedAt = System.currentTimeMillis()
+        _paused.value = false
         _sessionState.value = current.copy(
             status = status,
             finishedAt = finishedAt,

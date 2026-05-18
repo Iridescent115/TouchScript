@@ -14,47 +14,30 @@ import com.lulucloud.touchscript.R
 import com.lulucloud.touchscript.TouchWorkshopApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AutomationRunnerService : LifecycleService() {
     private var currentJob: Job? = null
+    private var overlayVisible = false
     private lateinit var overlayController: AutomationOverlayController
 
     override fun onCreate() {
         super.onCreate()
         overlayController = AutomationOverlayController(this)
         createNotificationChannel()
+        observeSession()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> {
-                lifecycleScope.launch {
-                    val container = appContainer()
-                    container.sessionManager.completeCancelled("用户停止了当前脚本")
-                    stopRunner()
-                }
-            }
-
-            ACTION_START -> {
-                val scriptName = intent.getStringExtra(EXTRA_SCRIPT_NAME).orEmpty().ifBlank {
-                    getString(R.string.default_script_name)
-                }
-                val scriptSource = intent.getStringExtra(EXTRA_SCRIPT_SOURCE).orEmpty()
-                if (scriptSource.isBlank()) {
-                    lifecycleScope.launch {
-                        appContainer().sessionManager.completeFailure("脚本内容为空，无法执行")
-                        stopRunner()
-                    }
-                } else {
-                    startForeground(NOTIFICATION_ID, createNotification(scriptName))
-                    startRunner(scriptName, scriptSource)
-                }
-            }
+            ACTION_SHOW_OVERLAY -> showOverlay()
+            ACTION_HIDE_OVERLAY -> hideOverlay()
+            ACTION_TOGGLE_START_STOP -> lifecycleScope.launch { toggleStartStop() }
+            ACTION_TOGGLE_PAUSE -> lifecycleScope.launch { appContainer().sessionManager.togglePause() }
+            ACTION_STOP -> lifecycleScope.launch { stopExecutionByUser() }
         }
-
         return START_STICKY
     }
 
@@ -64,45 +47,114 @@ class AutomationRunnerService : LifecycleService() {
         super.onDestroy()
     }
 
-    private fun startRunner(scriptName: String, scriptSource: String) {
-        currentJob?.cancel()
+    private fun showOverlay() {
+        overlayVisible = true
+        startForeground(NOTIFICATION_ID, createNotification("悬浮窗已启用"))
+        overlayController.show()
+        renderOverlay()
+    }
+
+    private fun hideOverlay() {
+        overlayVisible = false
+        overlayController.hide()
+        if (currentJob == null) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    private suspend fun toggleStartStop() {
+        when (appContainer().sessionManager.sessionState.value.status) {
+            SessionStatus.RUNNING,
+            SessionStatus.PAUSED -> stopExecutionByUser()
+
+            else -> startSelectedScript()
+        }
+    }
+
+    private suspend fun startSelectedScript() {
         val container = appContainer()
+        val settings = container.settingsRepository.getSettings()
+        val path = settings.selectedScriptPath
+            ?: run {
+                container.sessionManager.completeFailure("未选择脚本文件")
+                return
+            }
+
+        val file = runCatching { container.fileScriptRepository.readFile(path) }
+            .getOrElse { throwable ->
+                container.sessionManager.completeFailure(throwable.message ?: "读取脚本失败")
+                return
+            }
+
+        currentJob?.cancel()
         currentJob = lifecycleScope.launch(Dispatchers.Default) {
             try {
-                container.sessionManager.start(scriptName)
-                val settings = container.settingsRepository.settings.first()
-                if (settings.showFloatingPanel) {
-                    withContext(Dispatchers.Main) {
-                        overlayController.show(scriptName)
-                    }
-                }
-                val compilation = container.scriptCompiler.compile(scriptSource)
+                container.sessionManager.start(file.name)
+                val compilation = container.scriptCompiler.compile(file.content)
                 container.sessionManager.appendLog("INFO", "DSL 编译成功，准备执行 Lua")
-                container.scriptRuntime.execute(compilation.luaSource, scriptName)
+                updateNotification("正在执行：${file.name}")
+                container.scriptRuntime.execute(compilation.luaSource, file.name)
                 container.sessionManager.completeSuccess("脚本执行完成")
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                container.sessionManager.completeCancelled("脚本执行已取消")
                 throw cancelled
             } catch (throwable: Throwable) {
                 container.sessionManager.appendLog("ERROR", throwable.message ?: "未知错误")
                 container.sessionManager.completeFailure("脚本执行失败")
             } finally {
-                stopRunner()
+                currentJob = null
+                if (!overlayVisible) {
+                    withContext(Dispatchers.Main) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
+                } else {
+                    updateNotification("悬浮窗已启用")
+                }
             }
         }
     }
 
-    private suspend fun stopRunner() {
+    private suspend fun stopExecutionByUser() {
         currentJob?.cancel()
         currentJob = null
-        withContext(Dispatchers.Main) {
-            overlayController.hide()
+        appContainer().sessionManager.completeCancelled("用户停止了当前脚本")
+        if (!overlayVisible) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        } else {
+            updateNotification("悬浮窗已启用")
         }
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
-    private fun createNotification(scriptName: String): Notification {
+    private fun observeSession() {
+        lifecycleScope.launch {
+            appContainer().sessionManager.sessionState.collectLatest {
+                renderOverlay()
+            }
+        }
+        lifecycleScope.launch {
+            appContainer().sessionManager.logs.collectLatest {
+                renderOverlay()
+            }
+        }
+    }
+
+    private fun renderOverlay() {
+        if (overlayVisible) {
+            overlayController.render(
+                sessionState = appContainer().sessionManager.sessionState.value,
+                logs = appContainer().sessionManager.logs.value
+            )
+        }
+    }
+
+    private fun updateNotification(contentText: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(NOTIFICATION_ID, createNotification(contentText))
+    }
+
+    private fun createNotification(contentText: String): Notification {
         val openAppIntent = PendingIntent.getActivity(
             this,
             0,
@@ -110,22 +162,12 @@ class AutomationRunnerService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stopIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, AutomationRunnerService::class.java).apply {
-                action = ACTION_STOP
-            },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(getString(R.string.notification_running_title))
-            .setContentText(getString(R.string.notification_running_text, scriptName))
+            .setContentTitle("触灵工坊")
+            .setContentText(contentText)
             .setContentIntent(openAppIntent)
             .setOngoing(true)
-            .addAction(0, getString(R.string.stop_running), stopIntent)
             .build()
     }
 
@@ -145,10 +187,11 @@ class AutomationRunnerService : LifecycleService() {
     private fun appContainer() = (application as TouchWorkshopApplication).appContainer
 
     companion object {
-        const val ACTION_START = "com.lulucloud.touchscript.action.START"
+        const val ACTION_SHOW_OVERLAY = "com.lulucloud.touchscript.action.SHOW_OVERLAY"
+        const val ACTION_HIDE_OVERLAY = "com.lulucloud.touchscript.action.HIDE_OVERLAY"
+        const val ACTION_TOGGLE_START_STOP = "com.lulucloud.touchscript.action.TOGGLE_START_STOP"
+        const val ACTION_TOGGLE_PAUSE = "com.lulucloud.touchscript.action.TOGGLE_PAUSE"
         const val ACTION_STOP = "com.lulucloud.touchscript.action.STOP"
-        const val EXTRA_SCRIPT_NAME = "extra_script_name"
-        const val EXTRA_SCRIPT_SOURCE = "extra_script_source"
 
         private const val CHANNEL_ID = "touch_workshop_runner"
         private const val NOTIFICATION_ID = 1001

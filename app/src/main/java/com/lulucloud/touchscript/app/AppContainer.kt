@@ -8,6 +8,7 @@ import com.lulucloud.touchscript.core.runtime.LuaHostBridge
 import com.lulucloud.touchscript.core.runtime.ScriptRuntime
 import com.lulucloud.touchscript.core.script.ScriptCompiler
 import com.lulucloud.touchscript.data.local.TouchWorkshopDatabase
+import com.lulucloud.touchscript.data.repository.FileScriptRepository
 import com.lulucloud.touchscript.data.repository.ScriptRepository
 import com.lulucloud.touchscript.data.repository.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +28,7 @@ class AppContainer(
     ).build()
 
     val settingsRepository = SettingsRepository(application)
+    val fileScriptRepository = FileScriptRepository(application)
     val scriptRepository = ScriptRepository(
         scriptDao = database.scriptDao(),
         templateDao = database.scriptTemplateDao(),
@@ -45,6 +47,7 @@ class AppContainer(
     init {
         applicationScope.launch {
             scriptRepository.ensureSeedData()
+            fileScriptRepository.ensureSeedFiles()
         }
     }
 }

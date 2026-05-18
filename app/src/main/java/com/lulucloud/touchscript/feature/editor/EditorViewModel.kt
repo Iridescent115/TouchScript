@@ -4,58 +4,38 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lulucloud.touchscript.core.script.CompilationResult
 import com.lulucloud.touchscript.core.script.ScriptCompiler
-import com.lulucloud.touchscript.data.local.ScriptEntity
-import com.lulucloud.touchscript.data.local.ScriptTemplateEntity
-import com.lulucloud.touchscript.data.repository.ScriptRepository
+import com.lulucloud.touchscript.data.repository.FileScriptRepository
+import com.lulucloud.touchscript.data.repository.LocalScriptFile
+import com.lulucloud.touchscript.data.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class EditorUiState(
-    val scripts: List<ScriptEntity> = emptyList(),
-    val templates: List<ScriptTemplateEntity> = emptyList(),
-    val currentScriptId: Long? = null,
-    val currentScriptName: String = "",
+    val currentFilePath: String? = null,
+    val currentScriptName: String = "未命名脚本",
     val currentSource: String = "",
     val generatedLua: String = "",
-    val compileMessage: String = "",
-    val compileError: String? = null
+    val compileMessage: String = "尚未编译",
+    val compileError: String? = null,
+    val scriptFiles: List<LocalScriptFile> = emptyList(),
+    val templateFiles: List<LocalScriptFile> = emptyList()
 )
 
 class EditorViewModel(
-    private val scriptRepository: ScriptRepository,
+    private val fileScriptRepository: FileScriptRepository,
+    private val settingsRepository: SettingsRepository,
     private val scriptCompiler: ScriptCompiler
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
+    private val undoStack = ArrayDeque<String>()
+
     init {
-        observeScripts()
-        observeTemplates()
-    }
-
-    fun createScript() {
-        _uiState.value = _uiState.value.copy(
-            currentScriptId = null,
-            currentScriptName = "未命名脚本",
-            currentSource = "",
-            generatedLua = "",
-            compileMessage = "已创建新脚本草稿",
-            compileError = null
-        )
-    }
-
-    fun selectScript(script: ScriptEntity) {
-        _uiState.value = _uiState.value.copy(
-            currentScriptId = script.id,
-            currentScriptName = script.name,
-            currentSource = script.source,
-            generatedLua = "",
-            compileMessage = "已载入脚本：${script.name}",
-            compileError = null
-        )
+        refreshFileLists()
+        loadSelectedScriptOrDefault()
     }
 
     fun updateScriptName(name: String) {
@@ -63,33 +43,25 @@ class EditorViewModel(
     }
 
     fun updateSource(source: String) {
-        _uiState.value = _uiState.value.copy(currentSource = source)
-    }
-
-    fun insertTemplate(template: ScriptTemplateEntity) {
-        val currentSource = _uiState.value.currentSource
-        val nextSource = if (currentSource.isBlank()) {
-            template.source
-        } else {
-            "$currentSource\n\n${template.source}"
+        if (source != _uiState.value.currentSource) {
+            undoStack.addLast(_uiState.value.currentSource)
+            if (undoStack.size > MAX_UNDO_COUNT) {
+                undoStack.removeFirst()
+            }
+            _uiState.value = _uiState.value.copy(currentSource = source)
         }
-        _uiState.value = _uiState.value.copy(
-            currentSource = nextSource,
-            compileMessage = "已插入模板：${template.name}"
-        )
     }
 
-    fun insertKeyword(keyword: String) {
-        val source = _uiState.value.currentSource
-        val nextSource = if (source.isBlank()) keyword else "$source\n$keyword"
-        _uiState.value = _uiState.value.copy(currentSource = nextSource)
+    fun undo() {
+        if (undoStack.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(currentSource = undoStack.removeLast())
+        }
     }
 
     fun compileCurrentScript() {
         viewModelScope.launch {
-            val source = _uiState.value.currentSource
-            runCatching { scriptCompiler.compile(source) }
-                .onSuccess(::updateCompileResult)
+            runCatching { scriptCompiler.compile(_uiState.value.currentSource) }
+                .onSuccess(::applyCompilationResult)
                 .onFailure { throwable ->
                     _uiState.value = _uiState.value.copy(
                         generatedLua = "",
@@ -100,27 +72,96 @@ class EditorViewModel(
         }
     }
 
-    suspend fun saveCurrentScript(): Pair<Long, String> {
-        val current = _uiState.value
-        val name = current.currentScriptName.ifBlank { "未命名脚本" }
-        val source = current.currentSource.ifBlank {
-            """
-                记录 "这是一个空脚本"
-                等待 300
-            """.trimIndent()
-        }
-        val scriptId = scriptRepository.saveScript(current.currentScriptId, name, source)
+    fun openFile(file: LocalScriptFile) {
+        undoStack.clear()
         _uiState.value = _uiState.value.copy(
-            currentScriptId = scriptId,
-            currentScriptName = name,
-            currentSource = source,
-            compileMessage = "脚本已保存",
+            currentFilePath = file.absolutePath,
+            currentScriptName = file.name,
+            currentSource = file.content,
+            generatedLua = "",
+            compileMessage = "已打开文件：${file.fileName}",
             compileError = null
         )
-        return scriptId to source
+        viewModelScope.launch {
+            settingsRepository.setSelectedScript(file.absolutePath, file.name)
+        }
     }
 
-    private fun updateCompileResult(result: CompilationResult) {
+    fun insertTemplate(file: LocalScriptFile) {
+        val next = if (_uiState.value.currentSource.isBlank()) {
+            file.content
+        } else {
+            _uiState.value.currentSource + "\n\n" + file.content
+        }
+        updateSource(next)
+    }
+
+    fun saveCurrent() {
+        viewModelScope.launch {
+            val current = _uiState.value
+            val saved = fileScriptRepository.saveScript(
+                fileNameWithoutExtension = current.currentScriptName,
+                content = current.currentSource,
+                path = current.currentFilePath
+            )
+            applySavedFile(saved, "已保存")
+        }
+    }
+
+    fun saveAs(name: String) {
+        viewModelScope.launch {
+            val saved = fileScriptRepository.saveScript(
+                fileNameWithoutExtension = name,
+                content = _uiState.value.currentSource
+            )
+            applySavedFile(saved, "已另存为 ${saved.fileName}")
+        }
+    }
+
+    fun createNewFile() {
+        undoStack.clear()
+        _uiState.value = EditorUiState(
+            currentScriptName = "未命名脚本",
+            scriptFiles = _uiState.value.scriptFiles,
+            templateFiles = _uiState.value.templateFiles
+        )
+    }
+
+    fun refreshFileLists() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                scriptFiles = fileScriptRepository.listUserScripts(),
+                templateFiles = fileScriptRepository.listTemplates()
+            )
+        }
+    }
+
+    private fun loadSelectedScriptOrDefault() {
+        viewModelScope.launch {
+            val settings = settingsRepository.getSettings()
+            val targetFile = settings.selectedScriptPath
+                ?.let { path -> runCatching { fileScriptRepository.readFile(path) }.getOrNull() }
+                ?: fileScriptRepository.listUserScripts().firstOrNull()
+
+            if (targetFile != null) {
+                openFile(targetFile)
+            }
+        }
+    }
+
+    private suspend fun applySavedFile(file: LocalScriptFile, message: String) {
+        settingsRepository.setSelectedScript(file.absolutePath, file.name)
+        _uiState.value = _uiState.value.copy(
+            currentFilePath = file.absolutePath,
+            currentScriptName = file.name,
+            currentSource = file.content,
+            compileMessage = message,
+            compileError = null
+        )
+        refreshFileLists()
+    }
+
+    private fun applyCompilationResult(result: CompilationResult) {
         _uiState.value = _uiState.value.copy(
             generatedLua = result.luaSource,
             compileMessage = "编译成功，共 ${result.ast.statements.size} 条顶层语句",
@@ -128,30 +169,7 @@ class EditorViewModel(
         )
     }
 
-    private fun observeScripts() {
-        viewModelScope.launch {
-            scriptRepository.observeScripts().collectLatest { scripts ->
-                val state = _uiState.value
-                val currentScript = scripts.firstOrNull { it.id == state.currentScriptId } ?: scripts.firstOrNull()
-                _uiState.value = if (currentScript != null && state.currentScriptId == null) {
-                    state.copy(
-                        scripts = scripts,
-                        currentScriptId = currentScript.id,
-                        currentScriptName = currentScript.name,
-                        currentSource = currentScript.source
-                    )
-                } else {
-                    state.copy(scripts = scripts)
-                }
-            }
-        }
-    }
-
-    private fun observeTemplates() {
-        viewModelScope.launch {
-            scriptRepository.observeTemplates().collectLatest { templates ->
-                _uiState.value = _uiState.value.copy(templates = templates)
-            }
-        }
+    private companion object {
+        const val MAX_UNDO_COUNT = 80
     }
 }

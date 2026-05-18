@@ -3,7 +3,7 @@ package com.lulucloud.touchscript.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.lulucloud.touchscript.feature.editor.EditorViewModel
-import com.lulucloud.touchscript.feature.runner.RunnerViewModel
+import com.lulucloud.touchscript.feature.home.HomeViewModel
 
 class AppViewModelFactory(
     private val appContainer: AppContainer
@@ -11,18 +11,19 @@ class AppViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
-            modelClass.isAssignableFrom(EditorViewModel::class.java) -> {
-                EditorViewModel(
-                    scriptRepository = appContainer.scriptRepository,
+            modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
+                HomeViewModel(
+                    fileScriptRepository = appContainer.fileScriptRepository,
+                    settingsRepository = appContainer.settingsRepository,
                     scriptCompiler = appContainer.scriptCompiler
                 ) as T
             }
 
-            modelClass.isAssignableFrom(RunnerViewModel::class.java) -> {
-                RunnerViewModel(
-                    sessionManager = appContainer.sessionManager,
-                    scriptRepository = appContainer.scriptRepository,
-                    settingsRepository = appContainer.settingsRepository
+            modelClass.isAssignableFrom(EditorViewModel::class.java) -> {
+                EditorViewModel(
+                    fileScriptRepository = appContainer.fileScriptRepository,
+                    settingsRepository = appContainer.settingsRepository,
+                    scriptCompiler = appContainer.scriptCompiler
                 ) as T
             }
 

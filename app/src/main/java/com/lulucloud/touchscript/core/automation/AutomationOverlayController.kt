@@ -8,46 +8,66 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.setPadding
 import com.lulucloud.touchscript.R
 
 class AutomationOverlayController(
     private val context: Context
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private var overlayView: View? = null
+    private var rootView: LinearLayout? = null
+    private var statusView: TextView? = null
+    private var logsView: TextView? = null
+    private var startStopView: TextView? = null
+    private var pauseView: TextView? = null
+    private var logPanelVisible = false
 
-    fun show(scriptName: String) {
-        if (!Settings.canDrawOverlays(context) || overlayView != null) {
+    fun show() {
+        if (!Settings.canDrawOverlays(context) || rootView != null) {
             return
         }
 
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundResource(R.drawable.bg_overlay_panel)
-            setPadding(32, 24, 32, 24)
-            addView(
-                TextView(context).apply {
-                    text = context.getString(R.string.overlay_running, scriptName)
-                    setTextColor(0xFFFFFFFF.toInt())
-                    textSize = 14f
-                }
-            )
-            addView(
-                Button(context).apply {
-                    text = context.getString(R.string.stop_running)
-                    setOnClickListener {
-                        context.startService(
-                            Intent(context, AutomationRunnerService::class.java).apply {
-                                action = AutomationRunnerService.ACTION_STOP
-                            }
-                        )
-                    }
-                }
-            )
         }
+
+        val buttonRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundResource(R.drawable.bg_overlay_pill)
+            setPadding(18)
+            addView(actionButton("启动/停止") {
+                dispatch(AutomationRunnerService.ACTION_TOGGLE_START_STOP)
+            }.also { startStopView = it })
+            addView(actionButton("暂停") {
+                dispatch(AutomationRunnerService.ACTION_TOGGLE_PAUSE)
+            }.also { pauseView = it })
+            addView(actionButton("日志") {
+                logPanelVisible = !logPanelVisible
+                logsView?.visibility = if (logPanelVisible) View.VISIBLE else View.GONE
+            })
+            addView(actionButton("退出") {
+                dispatch(AutomationRunnerService.ACTION_HIDE_OVERLAY)
+            })
+        }
+
+        val logPanel = TextView(context).apply {
+            setBackgroundResource(R.drawable.bg_overlay_panel)
+            setPadding(24)
+            visibility = View.GONE
+            setTextColor(0xFFF6F1E8.toInt())
+            textSize = 12f
+        }.also { logsView = it }
+
+        val status = TextView(context).apply {
+            setTextColor(0xFFF6F1E8.toInt())
+            textSize = 12f
+        }.also { statusView = it }
+
+        container.addView(buttonRow)
+        container.addView(status)
+        container.addView(logPanel)
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -62,19 +82,63 @@ class AutomationOverlayController(
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = 24
-            y = 120
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = 150
         }
 
         windowManager.addView(container, params)
-        overlayView = container
+        rootView = container
+    }
+
+    fun render(sessionState: AutomationSessionState, logs: List<ExecutionLogEntry>) {
+        startStopView?.text = if (sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PAUSED) {
+            "停止"
+        } else {
+            "启动"
+        }
+        pauseView?.text = if (sessionState.status == SessionStatus.PAUSED) "继续" else "暂停"
+        statusView?.text = "状态：${sessionState.status.name}  脚本：${sessionState.scriptName.ifBlank { "未加载" }}"
+        logsView?.text = buildString {
+            append("状态：${sessionState.status.name}\n")
+            if (sessionState.summary.isNotBlank()) {
+                append("摘要：${sessionState.summary}\n")
+            }
+            append("\n最近日志：\n")
+            if (logs.isEmpty()) {
+                append("暂无日志")
+            } else {
+                logs.takeLast(6).forEach { log ->
+                    append("[${log.level}] ${log.message}\n")
+                }
+            }
+        }.trim()
     }
 
     fun hide() {
-        overlayView?.let {
-            windowManager.removeView(it)
-            overlayView = null
+        rootView?.let(windowManager::removeView)
+        rootView = null
+        statusView = null
+        logsView = null
+        startStopView = null
+        pauseView = null
+        logPanelVisible = false
+    }
+
+    private fun actionButton(text: String, onClick: () -> Unit): TextView {
+        return TextView(context).apply {
+            this.text = text
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 13f
+            setPadding(24)
+            setOnClickListener { onClick() }
         }
+    }
+
+    private fun dispatch(action: String) {
+        context.startService(
+            Intent(context, AutomationRunnerService::class.java).apply {
+                this.action = action
+            }
+        )
     }
 }

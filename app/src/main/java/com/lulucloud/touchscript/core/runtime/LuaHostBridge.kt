@@ -65,12 +65,8 @@ class LuaHostBridge(
         set("sleep", function { args ->
             runAction(SleepAction(args.checklong(1)))
         })
-        set("back", zeroArgFunction {
-            runAction(BackAction)
-        })
-        set("home", zeroArgFunction {
-            runAction(HomeAction)
-        })
+        set("back", zeroArgFunction { runAction(BackAction) })
+        set("home", zeroArgFunction { runAction(HomeAction) })
     }
 
     private fun appTable(): LuaTable = LuaTable().apply {
@@ -98,6 +94,7 @@ class LuaHostBridge(
 
     private fun runAction(action: AutomationAction): LuaValue {
         val result = runBlocking {
+            sessionManager.awaitIfPaused()
             val actionName = action::class.simpleName ?: action.javaClass.simpleName
             sessionManager.appendLog("INFO", "执行动作：$actionName")
             automationExecutor.perform(action)

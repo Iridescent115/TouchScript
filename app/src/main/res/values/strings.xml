@@ -2,8 +2,8 @@
     <string name="app_name">触灵工坊</string>
     <string name="accessibility_service_name">触灵工坊自动化服务</string>
     <string name="notification_channel_name">脚本执行服务</string>
-    <string name="notification_running_title">触灵工坊正在执行脚本</string>
-    <string name="notification_running_text">当前脚本：%1$s</string>
+    <string name="notification_running_title">触灵工坊</string>
+    <string name="notification_running_text">%1$s</string>
     <string name="default_script_name">未命名脚本</string>
     <string name="stop_running">停止运行</string>
     <string name="overlay_running">正在执行：%1$s</string>
