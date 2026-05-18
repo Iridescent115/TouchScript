@@ -16,7 +16,7 @@ data class HomeUiState(
     val availableScripts: List<LocalScriptFile> = emptyList(),
     val selectedScriptName: String = "",
     val selectedScriptPath: String? = null,
-    val selectedScriptSummary: String = "未加载脚本",
+    val selectedScriptSummary: String = "还没有加载脚本",
     val isScriptReady: Boolean = false,
     val validationMessage: String = "请先加载一个脚本文件"
 )
@@ -56,7 +56,7 @@ class HomeViewModel(
                     _uiState.value = _uiState.value.copy(
                         selectedScriptName = "",
                         selectedScriptPath = null,
-                        selectedScriptSummary = "未加载脚本",
+                        selectedScriptSummary = "还没有加载脚本",
                         isScriptReady = false,
                         validationMessage = "请先加载一个脚本文件"
                     )
@@ -76,9 +76,9 @@ class HomeViewModel(
             _uiState.value = _uiState.value.copy(
                 selectedScriptName = file.name,
                 selectedScriptPath = file.absolutePath,
-                selectedScriptSummary = "脚本共 ${compilation.ast.statements.size} 条顶层语句",
+                selectedScriptSummary = "脚本包含 ${compilation.ast.statements.size} 条顶层语句",
                 isScriptReady = true,
-                validationMessage = "脚本可用，已通过 DSL 编译检查"
+                validationMessage = "脚本可用，已通过 DSL 编译校验"
             )
         }.onFailure { throwable ->
             _uiState.value = _uiState.value.copy(

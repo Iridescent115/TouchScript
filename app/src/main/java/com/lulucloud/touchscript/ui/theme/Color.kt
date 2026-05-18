@@ -2,10 +2,16 @@ package com.lulucloud.touchscript.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val WorkshopOrange = Color(0xFFDE7C31)
-val WorkshopOrangeDeep = Color(0xFF8B4513)
-val WorkshopCream = Color(0xFFF6F1E8)
-val WorkshopInk = Color(0xFF16212E)
-val WorkshopMint = Color(0xFF5FB6A8)
-val WorkshopText = Color(0xFF223041)
-val WorkshopPaper = Color(0xFFFFFBF5)
+val WorkshopCopper = Color(0xFF9F5630)
+val WorkshopCopperSoft = Color(0xFFD8B38F)
+val WorkshopCopperDeep = Color(0xFF6B3415)
+val WorkshopPaper = Color(0xFFF7F2EA)
+val WorkshopPaperWarm = Color(0xFFEDE1D0)
+val WorkshopInk = Color(0xFF182330)
+val WorkshopInkSoft = Color(0xFF2B3847)
+val WorkshopTeal = Color(0xFF2E7C74)
+val WorkshopTealSoft = Color(0xFFB8DCD5)
+val WorkshopText = Color(0xFF21303E)
+val WorkshopTextMuted = Color(0xFF5E6A76)
+val WorkshopSuccess = Color(0xFF2E6B46)
+val WorkshopSuccessSoft = Color(0xFFCFE8D6)

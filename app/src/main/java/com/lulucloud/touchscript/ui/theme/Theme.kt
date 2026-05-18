@@ -12,35 +12,57 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = WorkshopOrange,
-    secondary = WorkshopMint,
-    tertiary = WorkshopCream,
-    background = WorkshopInk,
-    surface = Color(0xFF1D2A39),
-    onPrimary = Color(0xFF1C120A),
-    onSecondary = WorkshopInk,
-    onBackground = Color(0xFFF5F0E7),
-    onSurface = Color(0xFFF5F0E7)
+    primary = Color(0xFFE2A16C),
+    onPrimary = Color(0xFF3B1A07),
+    primaryContainer = Color(0xFF5C3115),
+    onPrimaryContainer = Color(0xFFFFD9BC),
+    secondary = Color(0xFF8CC9C0),
+    onSecondary = Color(0xFF0A3833),
+    secondaryContainer = Color(0xFF174D46),
+    onSecondaryContainer = Color(0xFFC3EEE7),
+    tertiary = Color(0xFFD7C0A4),
+    onTertiary = Color(0xFF3A2A17),
+    background = Color(0xFF111A24),
+    onBackground = Color(0xFFF2EBDD),
+    surface = Color(0xFF182330),
+    onSurface = Color(0xFFF2EBDD),
+    surfaceVariant = Color(0xFF233243),
+    onSurfaceVariant = Color(0xFFC1C9D2),
+    outline = Color(0xFF5A6877),
+    error = Color(0xFFFFB4AB),
+    errorContainer = Color(0xFF93000A),
+    onError = Color(0xFF690005),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = WorkshopOrange,
-    secondary = WorkshopMint,
-    tertiary = WorkshopOrangeDeep,
-    background = WorkshopPaper,
-    surface = WorkshopCream,
-    onPrimary = Color.White,
-    onSecondary = WorkshopInk,
+    primary = WorkshopCopper,
+    onPrimary = Color(0xFFFFF8F3),
+    primaryContainer = WorkshopCopperSoft,
+    onPrimaryContainer = WorkshopCopperDeep,
+    secondary = WorkshopTeal,
+    onSecondary = Color(0xFFF6FFFC),
+    secondaryContainer = WorkshopTealSoft,
+    onSecondaryContainer = Color(0xFF123E39),
+    tertiary = WorkshopInkSoft,
     onTertiary = Color.White,
+    background = WorkshopPaper,
     onBackground = WorkshopText,
-    onSurface = WorkshopText
+    surface = Color(0xFFFFFBF7),
+    onSurface = WorkshopText,
+    surfaceVariant = WorkshopPaperWarm,
+    onSurfaceVariant = WorkshopTextMuted,
+    outline = Color(0xFFC7B39C),
+    error = Color(0xFFB3261E),
+    errorContainer = Color(0xFFF9DEDC),
+    onError = Color.White,
+    onErrorContainer = Color(0xFF410E0B)
 )
 
 @Composable
 fun TouchScriptTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
