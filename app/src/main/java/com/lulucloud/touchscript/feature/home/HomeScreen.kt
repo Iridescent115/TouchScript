@@ -1,20 +1,30 @@
 package com.lulucloud.touchscript.feature.home
 
+import android.app.Activity
 import android.content.Context
-import androidx.compose.foundation.horizontalScroll
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -22,22 +32,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.lulucloud.touchscript.common.AutomationLauncher
 import com.lulucloud.touchscript.data.repository.LocalScriptFile
-import com.lulucloud.touchscript.ui.components.WorkshopHeroCard
-import com.lulucloud.touchscript.ui.components.WorkshopPanel
-import com.lulucloud.touchscript.ui.components.WorkshopScreen
-import com.lulucloud.touchscript.ui.components.WorkshopStatusChip
 import com.lulucloud.touchscript.ui.theme.WorkshopSuccess
-import com.lulucloud.touchscript.ui.theme.WorkshopSuccessSoft
 
 @Composable
 fun HomeScreen(
@@ -45,156 +47,89 @@ fun HomeScreen(
     context: Context
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showFileDialog by remember { mutableStateOf(false) }
     val readyColor = if (uiState.isScriptReady) WorkshopSuccess else MaterialTheme.colorScheme.error
-    val readyContainer = if (uiState.isScriptReady) {
-        WorkshopSuccessSoft
-    } else {
-        MaterialTheme.colorScheme.errorContainer
+    val openScriptLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        val uri = data?.data ?: return@rememberLauncherForActivityResult
+        if (result.resultCode == Activity.RESULT_OK) {
+            val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            }
+            viewModel.loadScript(uri.toString())
+        }
     }
 
-    WorkshopScreen(modifier = Modifier.statusBarsPadding()) {
-        WorkshopHeroCard(
-            eyebrow = "原型工作台",
-            title = "触灵工坊",
-            subtitle = "把中文脚本的加载、编译校验和悬浮窗启动收进一个更克制、更像工具台的首页。"
-        ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                WorkshopStatusChip(text = "DSL → Lua")
-                WorkshopStatusChip(
-                    text = if (uiState.isScriptReady) "脚本已就绪" else "等待校验通过",
-                    containerColor = readyContainer,
-                    contentColor = readyColor
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        MaterialTheme.colorScheme.background
+                    )
                 )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HomeMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "编译链",
-                value = "DSL 校验"
             )
-            HomeMetricCard(
-                modifier = Modifier.weight(1f),
-                title = "执行入口",
-                value = "悬浮窗控制"
-            )
-        }
-
-        WorkshopPanel(
-            title = "当前脚本",
-            subtitle = "加载脚本后会自动执行一次 DSL 编译校验。"
-        ) {
-            Text(
-                text = uiState.selectedScriptName.ifBlank { "还没有选择脚本" },
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = uiState.selectedScriptSummary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            WorkshopStatusChip(
-                text = uiState.validationMessage,
-                containerColor = readyContainer,
-                contentColor = readyColor
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = { AutomationLauncher.showOverlay(context) },
-                enabled = uiState.isScriptReady,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(min = 160.dp)
-            ) {
-                Text("启用悬浮窗")
-            }
-
-            OutlinedButton(
-                onClick = {
-                    viewModel.refreshFiles()
-                    showFileDialog = true
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("加载脚本")
-            }
-        }
-
-        WorkshopPanel(
-            title = "使用流程",
-            subtitle = "首页只保留一个主动作，避免在启动前让用户分心。"
-        ) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                WorkflowChip("1. 选择脚本")
-                WorkflowChip("2. 自动校验")
-                WorkflowChip("3. 启动悬浮窗")
-                WorkflowChip("4. 在悬浮条里执行")
-            }
-        }
-    }
-
-    if (showFileDialog) {
-        ScriptFilePickerDialog(
-            title = "选择要加载的脚本",
-            files = uiState.availableScripts,
-            onDismiss = { showFileDialog = false },
-            onSelect = {
-                viewModel.loadScript(it)
-                showFileDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun HomeMetricCard(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (uiState.selectedScriptName.isBlank()) "未选择脚本" else uiState.selectedScriptName,
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Icon(
+                    imageVector = if (uiState.isScriptReady) {
+                        Icons.Rounded.CheckCircle
+                    } else {
+                        Icons.Rounded.Close
+                    },
+                    contentDescription = if (uiState.isScriptReady) "脚本可用" else "脚本不可用",
+                    tint = readyColor
+                )
+            }
             Text(
-                text = title,
+                text = uiState.validationMessage,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        viewModel.clearDebugDraft()
+                        AutomationLauncher.showOverlay(context)
+                    },
+                    enabled = uiState.isScriptReady,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(min = 160.dp)
+                ) {
+                    Text("启用悬浮窗")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        openScriptLauncher.launch(buildOpenScriptIntent(uiState.scriptWorkspaceUri))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("加载脚本")
+                }
+            }
         }
     }
-}
-
-@Composable
-private fun WorkflowChip(text: String) {
-    WorkshopStatusChip(
-        text = text,
-        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    )
 }
 
 @Composable
@@ -248,3 +183,24 @@ fun ScriptFilePickerDialog(
         }
     )
 }
+
+private fun buildOpenScriptIntent(initialUri: String?): Intent {
+    return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "*/*"
+        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/octet-stream", "*/*"))
+        putExtra(
+            DocumentsContract.EXTRA_INITIAL_URI,
+            initialUri?.let(Uri::parse) ?: buildDefaultTouchScriptDocumentUri()
+        )
+    }
+}
+
+private fun buildDefaultTouchScriptDocumentUri(): Uri {
+    return DocumentsContract.buildDocumentUri(
+        EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
+        "primary:Documents/TouchScript"
+    )
+}
+
+private const val EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY = "com.android.externalstorage.documents"

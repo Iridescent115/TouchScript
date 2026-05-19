@@ -1,19 +1,30 @@
 package com.lulucloud.touchscript.navigation
 
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -25,26 +36,53 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.lulucloud.touchscript.app.AppContainer
 import com.lulucloud.touchscript.app.AppViewModelFactory
 import com.lulucloud.touchscript.feature.editor.EditorScreen
 import com.lulucloud.touchscript.feature.editor.EditorViewModel
 import com.lulucloud.touchscript.feature.home.HomeScreen
 import com.lulucloud.touchscript.feature.home.HomeViewModel
 import com.lulucloud.touchscript.feature.settings.SettingsScreen
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 
 @Composable
 fun TouchWorkshopApp(
-    appViewModelFactory: AppViewModelFactory
+    appViewModelFactory: AppViewModelFactory,
+    appContainer: AppContainer
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
+    val appSettings by appContainer.settingsRepository.settings.collectAsState(
+        initial = com.lulucloud.touchscript.data.repository.AppSettings()
+    )
+    val coroutineScope = rememberCoroutineScope()
+    var workspaceDialogDismissed by rememberSaveable { mutableStateOf(false) }
     val destinations = listOf(
         AppDestination.Home,
         AppDestination.Editor,
         AppDestination.Settings
     )
+    val workspaceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        val uri = data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+            }
+            coroutineScope.launch {
+                val workspaceUri = appContainer.fileScriptRepository.ensureScriptWorkspace(uri.toString())
+                appContainer.settingsRepository.setScriptWorkspaceUri(workspaceUri)
+                workspaceDialogDismissed = false
+            }
+        } else {
+            workspaceDialogDismissed = true
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -96,6 +134,28 @@ fun TouchWorkshopApp(
             }
         }
     }
+
+    if (appSettings.scriptWorkspaceUri.isNullOrBlank() && !workspaceDialogDismissed) {
+        AlertDialog(
+            onDismissRequest = { workspaceDialogDismissed = true },
+            title = { Text("初始化脚本目录") },
+            text = { Text("首次使用需要授权 Documents 目录。授权后会自动创建 Documents/TouchScript。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        workspaceLauncher.launch(buildInitialWorkspaceTreeIntent())
+                    }
+                ) {
+                    Text("去授权")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { workspaceDialogDismissed = true }) {
+                    Text("稍后")
+                }
+            }
+        )
+    }
 }
 
 private sealed class AppDestination(
@@ -107,3 +167,17 @@ private sealed class AppDestination(
     data object Editor : AppDestination("editor", "编辑器", Icons.AutoMirrored.Outlined.Article)
     data object Settings : AppDestination("settings", "设置", Icons.Outlined.Settings)
 }
+
+private fun buildInitialWorkspaceTreeIntent(): Intent {
+    return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+        putExtra(
+            DocumentsContract.EXTRA_INITIAL_URI,
+            DocumentsContract.buildTreeDocumentUri(
+                EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
+                "primary:Documents"
+            )
+        )
+    }
+}
+
+private const val EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY = "com.android.externalstorage.documents"

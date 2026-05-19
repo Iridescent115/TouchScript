@@ -16,7 +16,8 @@ data class AppSettings(
     val editorFontScale: Float = 1f,
     val defaultDelayMs: Int = 120,
     val selectedScriptPath: String? = null,
-    val selectedScriptName: String? = null
+    val selectedScriptName: String? = null,
+    val scriptWorkspaceUri: String? = null
 )
 
 class SettingsRepository(
@@ -27,7 +28,8 @@ class SettingsRepository(
             editorFontScale = preferences[EDITOR_FONT_SCALE] ?: 1f,
             defaultDelayMs = preferences[DEFAULT_DELAY_MS] ?: 120,
             selectedScriptPath = preferences[SELECTED_SCRIPT_PATH],
-            selectedScriptName = preferences[SELECTED_SCRIPT_NAME]
+            selectedScriptName = preferences[SELECTED_SCRIPT_NAME],
+            scriptWorkspaceUri = preferences[SCRIPT_WORKSPACE_URI]
         )
     }
 
@@ -60,10 +62,21 @@ class SettingsRepository(
         }
     }
 
+    suspend fun setScriptWorkspaceUri(uri: String?) {
+        context.settingsDataStore.edit { preferences ->
+            if (uri.isNullOrBlank()) {
+                preferences.remove(SCRIPT_WORKSPACE_URI)
+            } else {
+                preferences[SCRIPT_WORKSPACE_URI] = uri
+            }
+        }
+    }
+
     private companion object {
         val EDITOR_FONT_SCALE = floatPreferencesKey("editor_font_scale")
         val DEFAULT_DELAY_MS = intPreferencesKey("default_delay_ms")
         val SELECTED_SCRIPT_PATH = stringPreferencesKey("selected_script_path")
         val SELECTED_SCRIPT_NAME = stringPreferencesKey("selected_script_name")
+        val SCRIPT_WORKSPACE_URI = stringPreferencesKey("script_workspace_uri")
     }
 }

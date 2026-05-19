@@ -2,6 +2,8 @@ package com.lulucloud.touchscript.feature.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lulucloud.touchscript.core.automation.DebugScriptDraft
+import com.lulucloud.touchscript.core.automation.DebugScriptDraftStore
 import com.lulucloud.touchscript.core.script.CompilationResult
 import com.lulucloud.touchscript.core.script.ScriptCompiler
 import com.lulucloud.touchscript.data.repository.FileScriptRepository
@@ -17,10 +19,9 @@ data class EditorUiState(
     val currentScriptName: String = "未命名脚本",
     val currentSource: String = "",
     val generatedLua: String = "",
-    val compileMessage: String = "尚未编译",
+    val compileMessage: String = "未编译",
     val compileError: String? = null,
-    val scriptFiles: List<LocalScriptFile> = emptyList(),
-    val templateFiles: List<LocalScriptFile> = emptyList()
+    val scriptWorkspaceUri: String? = null
 )
 
 class EditorViewModel(
@@ -34,12 +35,8 @@ class EditorViewModel(
     private val undoStack = ArrayDeque<String>()
 
     init {
-        refreshFileLists()
         loadSelectedScriptOrDefault()
-    }
-
-    fun updateScriptName(name: String) {
-        _uiState.value = _uiState.value.copy(currentScriptName = name)
+        loadWorkspace()
     }
 
     fun updateSource(source: String) {
@@ -72,80 +69,97 @@ class EditorViewModel(
         }
     }
 
-    fun openFile(file: LocalScriptFile) {
-        undoStack.clear()
-        _uiState.value = _uiState.value.copy(
-            currentFilePath = file.absolutePath,
-            currentScriptName = file.name,
-            currentSource = file.content,
-            generatedLua = "",
-            compileMessage = "已打开文件：${file.fileName}",
-            compileError = null
-        )
+    fun openFile(location: String) {
         viewModelScope.launch {
-            settingsRepository.setSelectedScript(file.absolutePath, file.name)
+            val file = fileScriptRepository.readFile(location)
+            applyOpenedFile(file, "已打开文件：${file.fileName}")
         }
     }
 
-    fun insertTemplate(file: LocalScriptFile) {
-        val next = if (_uiState.value.currentSource.isBlank()) {
-            file.content
-        } else {
-            _uiState.value.currentSource + "\n\n" + file.content
+    fun insertSnippet(snippet: String) {
+        val normalizedSnippet = snippet.trimEnd()
+        if (normalizedSnippet.isBlank()) return
+
+        val current = _uiState.value.currentSource.trimEnd()
+        val next = when {
+            current.isBlank() -> normalizedSnippet
+            else -> "$current\n\n$normalizedSnippet"
         }
         updateSource(next)
     }
 
-    fun saveCurrent() {
+    fun saveCurrentToLocation(location: String) {
         viewModelScope.launch {
             val current = _uiState.value
             val saved = fileScriptRepository.saveScript(
                 fileNameWithoutExtension = current.currentScriptName,
                 content = current.currentSource,
-                path = current.currentFilePath
+                path = location
             )
             applySavedFile(saved, "已保存")
         }
     }
 
-    fun saveAs(name: String) {
+    fun saveAsToLocation(name: String, location: String) {
         viewModelScope.launch {
             val saved = fileScriptRepository.saveScript(
-                fileNameWithoutExtension = name,
-                content = _uiState.value.currentSource
+                fileNameWithoutExtension = normalizeScriptDisplayName(name),
+                content = _uiState.value.currentSource,
+                path = location
             )
             applySavedFile(saved, "已另存为 ${saved.fileName}")
         }
     }
 
-    fun createNewFile() {
+    fun prepareDebugDraft(onReady: () -> Unit) {
+        val current = _uiState.value
+        DebugScriptDraftStore.set(
+            DebugScriptDraft(
+                scriptName = current.currentScriptName,
+                content = current.currentSource
+            )
+        )
+        onReady()
+    }
+
+    fun clearDebugDraft() {
+        DebugScriptDraftStore.clear()
+    }
+
+    fun createNewFile(name: String) {
         undoStack.clear()
-        _uiState.value = EditorUiState(
-            currentScriptName = "未命名脚本",
-            scriptFiles = _uiState.value.scriptFiles,
-            templateFiles = _uiState.value.templateFiles
+        _uiState.value = _uiState.value.copy(
+            currentFilePath = null,
+            currentScriptName = normalizeScriptDisplayName(name),
+            currentSource = "",
+            generatedLua = "",
+            compileMessage = "新建脚本",
+            compileError = null
         )
     }
 
-    fun refreshFileLists() {
+    fun configureScriptWorkspace(parentTreeUri: String, onReady: (String) -> Unit) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                scriptFiles = fileScriptRepository.listUserScripts(),
-                templateFiles = fileScriptRepository.listTemplates()
-            )
+            val workspaceUri = fileScriptRepository.ensureScriptWorkspace(parentTreeUri)
+            settingsRepository.setScriptWorkspaceUri(workspaceUri)
+            _uiState.value = _uiState.value.copy(scriptWorkspaceUri = workspaceUri)
+            onReady(workspaceUri)
         }
     }
 
     private fun loadSelectedScriptOrDefault() {
         viewModelScope.launch {
             val settings = settingsRepository.getSettings()
-            val targetFile = settings.selectedScriptPath
-                ?.let { path -> runCatching { fileScriptRepository.readFile(path) }.getOrNull() }
-                ?: fileScriptRepository.listUserScripts().firstOrNull()
+            val targetLocation = settings.selectedScriptPath ?: return@launch
+            runCatching { fileScriptRepository.readFile(targetLocation) }
+                .onSuccess { applyOpenedFile(it, "已打开文件：${it.fileName}") }
+        }
+    }
 
-            if (targetFile != null) {
-                openFile(targetFile)
-            }
+    private fun loadWorkspace() {
+        viewModelScope.launch {
+            val settings = settingsRepository.getSettings()
+            _uiState.value = _uiState.value.copy(scriptWorkspaceUri = settings.scriptWorkspaceUri)
         }
     }
 
@@ -153,12 +167,24 @@ class EditorViewModel(
         settingsRepository.setSelectedScript(file.absolutePath, file.name)
         _uiState.value = _uiState.value.copy(
             currentFilePath = file.absolutePath,
-            currentScriptName = file.name,
+            currentScriptName = normalizeScriptDisplayName(file.name),
             currentSource = file.content,
             compileMessage = message,
             compileError = null
         )
-        refreshFileLists()
+    }
+
+    private suspend fun applyOpenedFile(file: LocalScriptFile, message: String) {
+        undoStack.clear()
+        settingsRepository.setSelectedScript(file.absolutePath, file.name)
+        _uiState.value = _uiState.value.copy(
+            currentFilePath = file.absolutePath,
+            currentScriptName = normalizeScriptDisplayName(file.name),
+            currentSource = file.content,
+            generatedLua = "",
+            compileMessage = message,
+            compileError = null
+        )
     }
 
     private fun applyCompilationResult(result: CompilationResult) {
@@ -172,4 +198,12 @@ class EditorViewModel(
     private companion object {
         const val MAX_UNDO_COUNT = 80
     }
+}
+
+private fun normalizeScriptDisplayName(name: String): String {
+    var result = name.trim()
+    while (result.endsWith(".tscript", ignoreCase = true)) {
+        result = result.dropLast(".tscript".length)
+    }
+    return result.ifBlank { "未命名脚本" }
 }

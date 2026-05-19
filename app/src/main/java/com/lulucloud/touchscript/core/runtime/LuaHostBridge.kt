@@ -78,6 +78,7 @@ class LuaHostBridge(
     private fun logTable(): LuaTable = LuaTable().apply {
         set("info", function { args ->
             runBlocking {
+                sessionManager.ensureNotStopped()
                 sessionManager.appendLog("INFO", args.checkjstring(1))
             }
             LuaValue.NIL
@@ -94,7 +95,9 @@ class LuaHostBridge(
 
     private fun runAction(action: AutomationAction): LuaValue {
         val result = runBlocking {
+            sessionManager.ensureNotStopped()
             sessionManager.awaitIfPaused()
+            sessionManager.ensureNotStopped()
             val actionName = action::class.simpleName ?: action.javaClass.simpleName
             sessionManager.appendLog("INFO", "执行动作：$actionName")
             automationExecutor.perform(action)

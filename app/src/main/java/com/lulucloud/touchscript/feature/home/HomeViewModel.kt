@@ -2,9 +2,9 @@ package com.lulucloud.touchscript.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lulucloud.touchscript.core.automation.DebugScriptDraftStore
 import com.lulucloud.touchscript.core.script.ScriptCompiler
 import com.lulucloud.touchscript.data.repository.FileScriptRepository
-import com.lulucloud.touchscript.data.repository.LocalScriptFile
 import com.lulucloud.touchscript.data.repository.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,12 +13,12 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
-    val availableScripts: List<LocalScriptFile> = emptyList(),
     val selectedScriptName: String = "",
     val selectedScriptPath: String? = null,
     val selectedScriptSummary: String = "还没有加载脚本",
     val isScriptReady: Boolean = false,
-    val validationMessage: String = "请先加载一个脚本文件"
+    val validationMessage: String = "请先加载一个脚本文件",
+    val scriptWorkspaceUri: String? = null
 )
 
 class HomeViewModel(
@@ -31,21 +31,19 @@ class HomeViewModel(
 
     init {
         observeSelectedScript()
-        refreshFiles()
     }
 
-    fun refreshFiles() {
+    fun loadScript(location: String) {
         viewModelScope.launch {
-            val files = fileScriptRepository.listAllScripts()
-            _uiState.value = _uiState.value.copy(availableScripts = files)
+            DebugScriptDraftStore.clear()
+            val file = fileScriptRepository.readFile(location)
+            settingsRepository.setSelectedScript(location, file.name)
+            validateFile(location)
         }
     }
 
-    fun loadScript(file: LocalScriptFile) {
-        viewModelScope.launch {
-            settingsRepository.setSelectedScript(file.absolutePath, file.name)
-            validateFile(file.absolutePath)
-        }
+    fun clearDebugDraft() {
+        DebugScriptDraftStore.clear()
     }
 
     private fun observeSelectedScript() {
@@ -58,9 +56,11 @@ class HomeViewModel(
                         selectedScriptPath = null,
                         selectedScriptSummary = "还没有加载脚本",
                         isScriptReady = false,
-                        validationMessage = "请先加载一个脚本文件"
+                        validationMessage = "请先加载一个脚本文件",
+                        scriptWorkspaceUri = settings.scriptWorkspaceUri
                     )
                 } else {
+                    _uiState.value = _uiState.value.copy(scriptWorkspaceUri = settings.scriptWorkspaceUri)
                     validateFile(path)
                 }
             }

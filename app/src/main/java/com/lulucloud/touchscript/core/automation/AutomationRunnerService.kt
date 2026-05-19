@@ -74,6 +74,15 @@ class AutomationRunnerService : LifecycleService() {
 
     private suspend fun startSelectedScript() {
         val container = appContainer()
+        val debugDraft = DebugScriptDraftStore.get()
+        if (debugDraft != null) {
+            startScriptExecution(
+                scriptName = debugDraft.scriptName,
+                source = debugDraft.content
+            )
+            return
+        }
+
         val settings = container.settingsRepository.getSettings()
         val path = settings.selectedScriptPath
             ?: run {
@@ -87,17 +96,34 @@ class AutomationRunnerService : LifecycleService() {
                 return
             }
 
+        startScriptExecution(
+            scriptName = file.name,
+            source = file.content
+        )
+    }
+
+    private fun startScriptExecution(
+        scriptName: String,
+        source: String
+    ) {
+        val container = appContainer()
         currentJob?.cancel()
         currentJob = lifecycleScope.launch(Dispatchers.Default) {
             try {
-                container.sessionManager.start(file.name)
-                val compilation = container.scriptCompiler.compile(file.content)
+                container.sessionManager.start(scriptName)
+                val compilation = container.scriptCompiler.compile(source)
                 container.sessionManager.appendLog("INFO", "DSL 编译成功，准备执行 Lua")
-                updateNotification("正在执行：${file.name}")
-                container.scriptRuntime.execute(compilation.luaSource, file.name)
+                updateNotification("正在执行：$scriptName")
+                container.scriptRuntime.execute(compilation.luaSource, scriptName)
                 container.sessionManager.completeSuccess("脚本执行完成")
+            } catch (stop: AutomationStopException) {
+                container.sessionManager.completeCancelled(stop.message ?: "用户停止了当前脚本")
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
+                if (container.sessionManager.isStopRequested()) {
+                    container.sessionManager.completeCancelled("用户停止了当前脚本")
+                } else {
+                    throw cancelled
+                }
             } catch (throwable: Throwable) {
                 container.sessionManager.appendLog("ERROR", throwable.message ?: "未知错误")
                 container.sessionManager.completeFailure("脚本执行失败")
@@ -116,9 +142,9 @@ class AutomationRunnerService : LifecycleService() {
     }
 
     private suspend fun stopExecutionByUser() {
+        appContainer().sessionManager.requestStop("用户停止了当前脚本")
         currentJob?.cancel()
         currentJob = null
-        appContainer().sessionManager.completeCancelled("用户停止了当前脚本")
         if (!overlayVisible) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

@@ -1,11 +1,10 @@
 package com.lulucloud.touchscript.core.automation
 
 import com.lulucloud.touchscript.data.repository.ScriptRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 
 class AutomationSessionManager(
     private val scriptRepository: ScriptRepository
@@ -13,6 +12,7 @@ class AutomationSessionManager(
     private val _sessionState = MutableStateFlow(AutomationSessionState())
     private val _logs = MutableStateFlow<List<ExecutionLogEntry>>(emptyList())
     private val _paused = MutableStateFlow(false)
+    private val _stopRequested = MutableStateFlow(false)
 
     val sessionState: StateFlow<AutomationSessionState> = _sessionState.asStateFlow()
     val logs: StateFlow<List<ExecutionLogEntry>> = _logs.asStateFlow()
@@ -24,6 +24,7 @@ class AutomationSessionManager(
             startedAt = System.currentTimeMillis()
         )
         _paused.value = false
+        _stopRequested.value = false
         _logs.value = emptyList()
         appendLog("INFO", "开始执行脚本：$scriptName")
     }
@@ -61,10 +62,29 @@ class AutomationSessionManager(
     }
 
     suspend fun awaitIfPaused() {
-        if (_paused.value) {
-            _paused.filter { paused -> !paused }.first()
+        while (_paused.value) {
+            ensureNotStopped()
+            delay(PAUSE_POLL_INTERVAL_MS)
+        }
+        ensureNotStopped()
+    }
+
+    suspend fun requestStop(summary: String = "用户停止了当前脚本") {
+        if (_stopRequested.value) {
+            return
+        }
+        _stopRequested.value = true
+        _paused.value = false
+        appendLog("INFO", summary)
+    }
+
+    fun ensureNotStopped() {
+        if (_stopRequested.value) {
+            throw AutomationStopException()
         }
     }
+
+    fun isStopRequested(): Boolean = _stopRequested.value
 
     suspend fun completeSuccess(summary: String) {
         finish(SessionStatus.SUCCESS, summary)
@@ -80,8 +100,12 @@ class AutomationSessionManager(
 
     private suspend fun finish(status: SessionStatus, summary: String) {
         val current = _sessionState.value
+        if (current.status == status && current.summary == summary && current.finishedAt > 0L) {
+            return
+        }
         val finishedAt = System.currentTimeMillis()
         _paused.value = false
+        _stopRequested.value = false
         _sessionState.value = current.copy(
             status = status,
             finishedAt = finishedAt,
@@ -101,5 +125,6 @@ class AutomationSessionManager(
 
     private companion object {
         const val MAX_LOG_COUNT = 200
+        const val PAUSE_POLL_INTERVAL_MS = 50L
     }
 }

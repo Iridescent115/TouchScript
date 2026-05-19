@@ -36,7 +36,7 @@ class AppContainer(
     )
     val sessionManager = AutomationSessionManager(scriptRepository)
     val scriptCompiler = ScriptCompiler()
-    val automationExecutor = AccessibilityAutomationExecutor(application)
+    val automationExecutor = AccessibilityAutomationExecutor(application, sessionManager)
     val scriptRuntime = ScriptRuntime(
         scriptRepository = scriptRepository,
         scriptCompiler = scriptCompiler,
