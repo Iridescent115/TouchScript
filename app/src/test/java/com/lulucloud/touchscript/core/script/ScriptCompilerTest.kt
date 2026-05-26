@@ -56,6 +56,24 @@ class ScriptCompilerTest {
     }
 
     @Test
+    fun `compile should support text recognition result assignment and member access`() {
+        val compiler = ScriptCompiler()
+
+        val result = compiler.compile(
+            """
+                设 文字1 = 识文字
+                如果 文字1.找到
+                记录 文字1.文本
+                结束如果
+            """.trimIndent()
+        )
+
+        assertTrue(result.luaSource.contains("""vars["文字1"] = ocr.recognize()"""))
+        assertTrue(result.luaSource.contains("""if __member(vars["文字1"], "found") then"""))
+        assertTrue(result.luaSource.contains("""log.info(__member(vars["文字1"], "text"))"""))
+    }
+
+    @Test
     fun `compile should generate while true for forever loop`() {
         val compiler = ScriptCompiler()
 

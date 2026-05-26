@@ -114,3 +114,5 @@ data class IrImageFindExpression(
     val imageName: IrExpression,
     val confidence: IrExpression
 ) : IrExpression
+
+data object IrTextRecognitionExpression : IrExpression

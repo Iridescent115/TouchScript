@@ -68,6 +68,27 @@ class ScriptParserTest {
     }
 
     @Test
+    fun `parseDsl should support text recognition expression result`() {
+        val parser = ScriptParser()
+
+        val result = parser.parseDsl(
+            """
+                设 文字1 = 识文字
+                如果 文字1.找到
+                记录 文字1.文本
+                结束如果
+            """.trimIndent()
+        )
+
+        val assignNode = result.statements[0] as AssignActionNode
+        assertTrue(assignNode.expression is TextRecognitionExpressionNode)
+
+        val ifNode = result.statements[1] as IfControlNode
+        assertTrue(ifNode.condition is MemberAccessExpressionNode)
+        assertTrue((ifNode.thenBranch[0] as LogActionNode).message is MemberAccessExpressionNode)
+    }
+
+    @Test
     fun `parseDsl should support forever loop`() {
         val parser = ScriptParser()
 

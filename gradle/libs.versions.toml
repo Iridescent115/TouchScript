@@ -16,6 +16,7 @@ serialization = "1.9.0"
 timber = "5.0.1"
 luaj = "3.0.1"
 opencv = "4.13.0"
+mlkitTextRecognitionChinese = "16.0.1"
 ksp = "2.2.10-2.0.2"
 
 [libraries]
@@ -46,6 +47,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 luaj-jse = { group = "org.luaj", name = "luaj-jse", version.ref = "luaj" }
 opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
+mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-recognition-chinese", version.ref = "mlkitTextRecognitionChinese" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 [plugins]

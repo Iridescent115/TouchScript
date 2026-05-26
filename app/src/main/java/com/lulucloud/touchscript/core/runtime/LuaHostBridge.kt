@@ -22,7 +22,8 @@ import org.luaj.vm2.lib.VarArgFunction
 class LuaHostBridge(
     private val automationExecutor: AutomationExecutor,
     private val sessionManager: AutomationSessionManager,
-    private val imageMatcher: ImageMatcher? = null
+    private val imageMatcher: ImageMatcher? = null,
+    private val textRecognizerEngine: TextRecognizerEngine? = null
 ) {
 
     fun install(globals: Globals) {
@@ -32,6 +33,7 @@ class LuaHostBridge(
         globals.set("app", appTable())
         globals.set("log", logTable())
         globals.set("image", imageTable())
+        globals.set("ocr", ocrTable())
         globals.set("runtime", runtimeTable())
     }
 
@@ -113,6 +115,30 @@ class LuaHostBridge(
         })
         set("requireFind", function { args ->
             runImageFind(args, failWhenMissing = true)
+        })
+    }
+
+    private fun ocrTable(): LuaTable = LuaTable().apply {
+        set("recognize", zeroArgFunction {
+            val recognizer = textRecognizerEngine ?: throw IllegalStateException("识文字服务未初始化")
+            val result = runBlocking {
+                sessionManager.ensureNotStopped()
+                sessionManager.awaitIfPaused()
+                sessionManager.ensureNotStopped()
+                sessionManager.appendLog("INFO", "开始识文字")
+                recognizer.recognizeScreenText()
+            }
+            runBlocking {
+                sessionManager.appendLog(
+                    if (result.found) "INFO" else "ERROR",
+                    "识文字${if (result.found) "成功" else "未发现文字"}：${result.lineCount} 行"
+                )
+            }
+            LuaTable().apply {
+                set("found", LuaValue.valueOf(result.found))
+                set("text", LuaValue.valueOf(result.text))
+                set("lineCount", LuaValue.valueOf(result.lineCount))
+            }
         })
     }
 

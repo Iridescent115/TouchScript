@@ -1290,10 +1290,11 @@ private enum class InsertOperationGroup(
             InsertOperationType.KEYBOARD_INPUT
         )
     ),
-    IMAGE(
-        label = "识图",
+    RECOGNITION(
+        label = "识别",
         operations = listOf(
-            InsertOperationType.IMAGE_FIND
+            InsertOperationType.IMAGE_FIND,
+            InsertOperationType.TEXT_RECOGNITION
         )
     ),
     LOGIC(
@@ -1395,6 +1396,10 @@ private enum class InsertOperationType(
         fieldLabelB = "置信度(0-1)",
         defaultFieldB = "0.85"
     ),
+    TEXT_RECOGNITION(
+        label = "识文字",
+        dialogTitle = "插入识文字"
+    ),
     ASSIGN(
         label = "设变量",
         dialogTitle = "插入设变量",
@@ -1466,6 +1471,16 @@ private enum class InsertOperationType(
                     """.trimIndent()
                 )
             }
+            TEXT_RECOGNITION -> InsertOperationPayload(
+                """
+                设 文字1 = 识文字
+                如果 文字1.找到
+                    记录 文字1.文本
+                否则
+                    记录 "未识别到文字"
+                结束如果
+                """.trimIndent()
+            )
             ASSIGN -> InsertOperationPayload("设 ${fieldA.ifBlank { "变量" }} = ${fieldB.ifBlank { "0" }}")
             REPEAT -> InsertOperationPayload(
                 snippet = "循环 ${fieldA.ifBlank { "3" }} 次\n$INSERT_CURSOR_MARKER\n结束循环",

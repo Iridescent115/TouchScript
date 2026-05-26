@@ -115,6 +115,8 @@ data class ImageFindExpressionNode(
     val confidence: ExpressionNode
 ) : ExpressionNode
 
+data object TextRecognitionExpressionNode : ExpressionNode
+
 enum class UnaryOperator {
     NOT,
     NEGATE

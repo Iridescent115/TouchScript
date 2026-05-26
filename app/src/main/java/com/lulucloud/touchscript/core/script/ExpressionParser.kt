@@ -246,6 +246,8 @@ internal class ExpressionParser(
                         imageName = parseUnary(),
                         confidence = parseOr()
                     )
+                } else if (identifier.text == KEYWORD_TEXT_RECOGNITION) {
+                    TextRecognitionExpressionNode
                 } else {
                     VariableReferenceNode(identifier.text)
                 }
@@ -309,5 +311,6 @@ internal class ExpressionParser(
 
     private companion object {
         const val KEYWORD_IMAGE_FIND = "识图"
+        const val KEYWORD_TEXT_RECOGNITION = "识文字"
     }
 }

@@ -7,6 +7,7 @@ import com.lulucloud.touchscript.core.automation.AutomationSessionManager
 import com.lulucloud.touchscript.core.runtime.ImageMatcher
 import com.lulucloud.touchscript.core.runtime.LuaHostBridge
 import com.lulucloud.touchscript.core.runtime.ScriptRuntime
+import com.lulucloud.touchscript.core.runtime.TextRecognizerEngine
 import com.lulucloud.touchscript.core.script.ScriptCompiler
 import com.lulucloud.touchscript.data.local.TouchWorkshopDatabase
 import com.lulucloud.touchscript.data.repository.FileScriptRepository
@@ -39,10 +40,11 @@ class AppContainer(
     val scriptCompiler = ScriptCompiler()
     val automationExecutor = AccessibilityAutomationExecutor(application, sessionManager)
     val imageMatcher = ImageMatcher(application, fileScriptRepository, settingsRepository)
+    val textRecognizerEngine = TextRecognizerEngine()
     val scriptRuntime = ScriptRuntime(
         scriptRepository = scriptRepository,
         scriptCompiler = scriptCompiler,
-        luaHostBridge = LuaHostBridge(automationExecutor, sessionManager, imageMatcher),
+        luaHostBridge = LuaHostBridge(automationExecutor, sessionManager, imageMatcher, textRecognizerEngine),
         sessionManager = sessionManager
     )
 

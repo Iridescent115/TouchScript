@@ -86,6 +86,8 @@ class ScriptLowerer {
                 imageName = lowerExpression(expressionNode.imageName),
                 confidence = lowerExpression(expressionNode.confidence)
             )
+
+            TextRecognitionExpressionNode -> IrTextRecognitionExpression
         }
     }
 }
@@ -207,12 +209,16 @@ class LuaGenerator {
             is IrImageFindExpression -> {
                 "image.find(${renderExpression(expression.imageName)}, ${renderExpression(expression.confidence)})"
             }
+
+            IrTextRecognitionExpression -> "ocr.recognize()"
         }
     }
 
     private fun mapMemberName(propertyName: String): String {
         return when (propertyName) {
             "找到", "found" -> "found"
+            "文本", "text" -> "text"
+            "行数", "lineCount" -> "lineCount"
             "置信度", "分数", "score" -> "score"
             "x", "X" -> "x"
             "y", "Y" -> "y"

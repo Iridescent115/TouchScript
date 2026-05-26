@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.luaj.jse)
+    implementation(libs.mlkit.text.recognition.chinese)
     implementation(libs.opencv)
     implementation(libs.timber)
     ksp(libs.androidx.room.compiler)
