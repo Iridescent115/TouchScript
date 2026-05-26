@@ -6,8 +6,10 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.os.Build
+import android.os.Bundle
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -53,6 +55,17 @@ class TouchWorkshopAccessibilityService : AccessibilityService() {
     fun back(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
 
     fun home(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
+
+    fun inputText(text: String): Boolean {
+        val focusedNode = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return false
+        val arguments = Bundle().apply {
+            putCharSequence(
+                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                text
+            )
+        }
+        return focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+    }
 
     suspend fun takeScreenshotBitmap(): Bitmap? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {

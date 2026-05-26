@@ -62,6 +62,7 @@
 - `点击 x y`
 - `长按 x y duration`
 - `滑动 x1 y1 x2 y2 duration`
+- `键盘输入 "文本"`
 - `等待 ms`
 - `设 结果 = 识图 "图片文件名" confidence`
 - `启动应用 "包名"`
@@ -105,6 +106,7 @@ Lua 侧会调用受控宿主 API，例如：
 - `touch.click(...)`
 - `touch.longPress(...)`
 - `touch.swipe(...)`
+- `keyboard.input(...)`
 - `device.sleep(...)`
 - `device.back()`
 - `device.home()`

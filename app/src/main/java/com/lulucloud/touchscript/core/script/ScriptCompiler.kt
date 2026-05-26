@@ -27,6 +27,7 @@ class ScriptLowerer {
                 durationMs = lowerExpression(statement.durationMs)
             )
 
+            is KeyboardInputActionNode -> IrKeyboardInputAction(lowerExpression(statement.text))
             is SleepActionNode -> IrSleepAction(lowerExpression(statement.durationMs))
             is LaunchAppActionNode -> IrLaunchAppAction(lowerExpression(statement.packageName))
             is LogActionNode -> IrLogAction(lowerExpression(statement.message))
@@ -114,6 +115,10 @@ class LuaGenerator {
 
             is IrSwipeAction -> builder.appendLine(
                 "${indent}touch.swipe(${renderExpression(instruction.startX)}, ${renderExpression(instruction.startY)}, ${renderExpression(instruction.endX)}, ${renderExpression(instruction.endY)}, ${renderExpression(instruction.durationMs)})"
+            )
+
+            is IrKeyboardInputAction -> builder.appendLine(
+                "${indent}keyboard.input(${renderExpression(instruction.text)})"
             )
 
             is IrSleepAction -> builder.appendLine(

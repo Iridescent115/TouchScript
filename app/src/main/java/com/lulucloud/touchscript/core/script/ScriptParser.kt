@@ -134,6 +134,11 @@ class ScriptParser {
                 )
             }
 
+            content.startsWith(KEYWORD_KEYBOARD_INPUT) -> {
+                val expression = content.removePrefix(KEYWORD_KEYBOARD_INPUT).trim()
+                KeyboardInputActionNode(ExpressionParser(line.lineNumber).parse(expression))
+            }
+
             content.startsWith(KEYWORD_SLEEP) -> {
                 val expression = content.removePrefix(KEYWORD_SLEEP).trim()
                 SleepActionNode(ExpressionParser(line.lineNumber).parse(expression))
@@ -237,6 +242,7 @@ class ScriptParser {
         const val KEYWORD_CLICK = "点击 "
         const val KEYWORD_LONG_PRESS = "长按 "
         const val KEYWORD_SWIPE = "滑动 "
+        const val KEYWORD_KEYBOARD_INPUT = "键盘输入 "
         const val KEYWORD_SLEEP = "等待 "
         const val KEYWORD_LAUNCH_APP = "启动应用 "
         const val KEYWORD_LOG = "记录 "

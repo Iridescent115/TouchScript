@@ -31,6 +31,10 @@ data class IrSwipeAction(
     val durationMs: IrExpression
 ) : IrAction
 
+data class IrKeyboardInputAction(
+    val text: IrExpression
+) : IrAction
+
 data class IrSleepAction(
     val durationMs: IrExpression
 ) : IrAction

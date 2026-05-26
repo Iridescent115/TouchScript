@@ -50,6 +50,7 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             "点击",
             "长按",
             "滑动",
+            "键盘输入",
             "等待",
             "启动应用",
             "记录",

@@ -23,6 +23,8 @@ class AccessibilityAutomationExecutor(
                 )
             }
 
+            is KeyboardInputAction -> withService { inputText(action.text) }
+
             is SleepAction -> {
                 var remainingMs = action.durationMs.coerceAtLeast(0L)
                 while (remainingMs > 0L) {

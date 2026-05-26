@@ -31,6 +31,10 @@ data class SwipeActionNode(
     val durationMs: ExpressionNode
 ) : ActionNode
 
+data class KeyboardInputActionNode(
+    val text: ExpressionNode
+) : ActionNode
+
 data class SleepActionNode(
     val durationMs: ExpressionNode
 ) : ActionNode

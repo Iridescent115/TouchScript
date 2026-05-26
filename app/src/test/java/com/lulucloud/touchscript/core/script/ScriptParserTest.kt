@@ -15,6 +15,7 @@ class ScriptParserTest {
                 设 次数 = 3
                 循环 次数 次
                 点击 540 1600
+                键盘输入 "你好，触灵"
                 等待 80
                 结束循环
                 如果 次数 > 0
@@ -32,7 +33,8 @@ class ScriptParserTest {
         assertTrue(result.statements[2] is IfControlNode)
 
         val repeatNode = result.statements[1] as RepeatControlNode
-        assertEquals(2, repeatNode.body.size)
+        assertEquals(3, repeatNode.body.size)
+        assertTrue(repeatNode.body[1] is KeyboardInputActionNode)
 
         val ifNode = result.statements[2] as IfControlNode
         assertEquals(2, ifNode.thenBranch.size)

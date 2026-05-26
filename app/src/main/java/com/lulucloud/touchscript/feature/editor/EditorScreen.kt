@@ -1271,7 +1271,8 @@ private enum class InsertOperationGroup(
         operations = listOf(
             InsertOperationType.CLICK,
             InsertOperationType.LONG_PRESS,
-            InsertOperationType.SWIPE
+            InsertOperationType.SWIPE,
+            InsertOperationType.KEYBOARD_INPUT
         )
     ),
     IMAGE(
@@ -1346,6 +1347,12 @@ private enum class InsertOperationType(
         defaultFieldC = "540",
         defaultFieldD = "500",
         defaultFieldE = "260"
+    ),
+    KEYBOARD_INPUT(
+        label = "键盘输入",
+        dialogTitle = "插入键盘输入",
+        fieldLabelA = "输入文本",
+        defaultFieldA = "预设文字"
     ),
     SLEEP(
         label = "等待",
@@ -1422,6 +1429,7 @@ private enum class InsertOperationType(
             CLICK -> InsertOperationPayload("点击 ${fieldA.ifBlank { "540" }} ${fieldB.ifBlank { "1600" }}")
             LONG_PRESS -> InsertOperationPayload("长按 ${fieldA.ifBlank { "540" }} ${fieldB.ifBlank { "1600" }} ${fieldC.ifBlank { "800" }}")
             SWIPE -> InsertOperationPayload("滑动 ${fieldA.ifBlank { "540" }} ${fieldB.ifBlank { "1500" }} ${fieldC.ifBlank { "540" }} ${fieldD.ifBlank { "500" }} ${fieldE.ifBlank { "260" }}")
+            KEYBOARD_INPUT -> InsertOperationPayload("键盘输入 \"${sanitizeQuotedText(fieldA.ifBlank { "预设文字" })}\"")
             SLEEP -> InsertOperationPayload("等待 ${fieldA.ifBlank { "500" }}")
             LAUNCH_APP -> InsertOperationPayload("启动应用 \"${sanitizeQuotedText(fieldA.ifBlank { "com.android.settings" })}\"")
             LOG -> InsertOperationPayload("记录 \"${sanitizeQuotedText(fieldA.ifBlank { "开始执行" })}\"")

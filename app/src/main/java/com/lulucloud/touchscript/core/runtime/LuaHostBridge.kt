@@ -6,6 +6,7 @@ import com.lulucloud.touchscript.core.automation.AutomationSessionManager
 import com.lulucloud.touchscript.core.automation.BackAction
 import com.lulucloud.touchscript.core.automation.ClickAction
 import com.lulucloud.touchscript.core.automation.HomeAction
+import com.lulucloud.touchscript.core.automation.KeyboardInputAction
 import com.lulucloud.touchscript.core.automation.LaunchAppAction
 import com.lulucloud.touchscript.core.automation.LongPressAction
 import com.lulucloud.touchscript.core.automation.SleepAction
@@ -26,6 +27,7 @@ class LuaHostBridge(
 
     fun install(globals: Globals) {
         globals.set("touch", touchTable())
+        globals.set("keyboard", keyboardTable())
         globals.set("device", deviceTable())
         globals.set("app", appTable())
         globals.set("log", logTable())
@@ -60,6 +62,12 @@ class LuaHostBridge(
                     durationMs = args.checklong(5)
                 )
             )
+        })
+    }
+
+    private fun keyboardTable(): LuaTable = LuaTable().apply {
+        set("input", function { args ->
+            runAction(KeyboardInputAction(args.arg(1).tojstring()))
         })
     }
 

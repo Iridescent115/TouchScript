@@ -26,6 +26,10 @@ data class SwipeAction(
     val durationMs: Long
 ) : AutomationAction
 
+data class KeyboardInputAction(
+    val text: String
+) : AutomationAction
+
 data class SleepAction(
     val durationMs: Long
 ) : AutomationAction
