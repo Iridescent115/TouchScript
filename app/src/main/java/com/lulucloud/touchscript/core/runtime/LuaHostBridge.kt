@@ -32,6 +32,7 @@ class LuaHostBridge(
         globals.set("app", appTable())
         globals.set("log", logTable())
         globals.set("image", imageTable())
+        globals.set("runtime", runtimeTable())
     }
 
     private fun touchTable(): LuaTable = LuaTable().apply {
@@ -90,6 +91,17 @@ class LuaHostBridge(
             runBlocking {
                 sessionManager.ensureNotStopped()
                 sessionManager.appendLog("INFO", args.arg(1).tojstring())
+            }
+            LuaValue.NIL
+        })
+    }
+
+    private fun runtimeTable(): LuaTable = LuaTable().apply {
+        set("stop", zeroArgFunction {
+            runBlocking {
+                sessionManager.appendLog("INFO", "脚本请求停止运行")
+                sessionManager.requestStop("脚本主动停止运行")
+                sessionManager.ensureNotStopped()
             }
             LuaValue.NIL
         })

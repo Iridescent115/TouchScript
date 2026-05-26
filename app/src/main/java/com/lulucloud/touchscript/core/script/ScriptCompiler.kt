@@ -42,6 +42,7 @@ class ScriptLowerer {
 
             BackActionNode -> IrBackAction
             HomeActionNode -> IrHomeAction
+            StopRunningActionNode -> IrStopRunningAction
             is RepeatControlNode -> IrRepeatInstruction(
                 count = lowerExpression(statement.count),
                 body = statement.body.map(::lowerInstruction)
@@ -143,6 +144,7 @@ class LuaGenerator {
 
             IrBackAction -> builder.appendLine("${indent}device.back()")
             IrHomeAction -> builder.appendLine("${indent}device.home()")
+            IrStopRunningAction -> builder.appendLine("${indent}runtime.stop()")
             is IrRepeatInstruction -> {
                 builder.appendLine("${indent}for __index = 1, ${renderExpression(instruction.count)} do")
                 instruction.body.forEach { appendInstruction(builder, it, indentLevel + 1) }

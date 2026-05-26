@@ -21,6 +21,7 @@ class ScriptParserTest {
                 如果 次数 > 0
                 记录 "done"
                 识图 "登录按钮.png" 0.85
+                停止运行
                 否则
                 返回
                 结束如果
@@ -37,9 +38,10 @@ class ScriptParserTest {
         assertTrue(repeatNode.body[1] is KeyboardInputActionNode)
 
         val ifNode = result.statements[2] as IfControlNode
-        assertEquals(2, ifNode.thenBranch.size)
+        assertEquals(3, ifNode.thenBranch.size)
         assertEquals(1, ifNode.elseBranch.size)
         assertTrue(ifNode.thenBranch[1] is ImageFindActionNode)
+        assertTrue(ifNode.thenBranch[2] is StopRunningActionNode)
     }
 
     @Test

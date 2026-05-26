@@ -182,6 +182,7 @@ class ScriptParser {
 
             content == KEYWORD_BACK -> BackActionNode
             content == KEYWORD_HOME -> HomeActionNode
+            content == KEYWORD_STOP_RUNNING -> StopRunningActionNode
             else -> throw ScriptParseException("无法识别的语句：$content", line.lineNumber)
         }
     }
@@ -250,6 +251,7 @@ class ScriptParser {
         const val KEYWORD_ASSIGN = "设 "
         const val KEYWORD_BACK = "返回"
         const val KEYWORD_HOME = "主页"
+        const val KEYWORD_STOP_RUNNING = "停止运行"
         const val KEYWORD_REPEAT_PREFIX = "循环 "
         const val KEYWORD_REPEAT_SUFFIX = " 次"
         const val KEYWORD_REPEAT_END = "结束循环"

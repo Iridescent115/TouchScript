@@ -20,6 +20,7 @@ class ScriptCompilerTest {
                 如果 次数 == 2
                 启动应用 "com.android.settings"
                 识图 "登录按钮.png" 0.9
+                停止运行
                 结束如果
             """.trimIndent()
         )
@@ -30,6 +31,7 @@ class ScriptCompilerTest {
         assertTrue(result.luaSource.contains("device.sleep(50)"))
         assertTrue(result.luaSource.contains("""app.launch("com.android.settings")"""))
         assertTrue(result.luaSource.contains("""image.requireFind("登录按钮.png", 0.9)"""))
+        assertTrue(result.luaSource.contains("runtime.stop()"))
         assertTrue(result.luaSource.contains("for __index = 1, vars[\"次数\"] do"))
     }
 

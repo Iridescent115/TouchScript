@@ -63,7 +63,8 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             "否则",
             "结束如果",
             "返回",
-            "主页"
+            "主页",
+            "停止运行"
         )
     }
 }

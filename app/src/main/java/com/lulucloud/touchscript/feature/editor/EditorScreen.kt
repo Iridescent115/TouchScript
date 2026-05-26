@@ -1277,7 +1277,8 @@ private enum class InsertOperationGroup(
             InsertOperationType.LAUNCH_APP,
             InsertOperationType.LOG,
             InsertOperationType.BACK,
-            InsertOperationType.HOME
+            InsertOperationType.HOME,
+            InsertOperationType.STOP_RUNNING
         )
     )
 }
@@ -1390,6 +1391,10 @@ private enum class InsertOperationType(
     HOME(
         label = "主页",
         dialogTitle = "插入主页"
+    ),
+    STOP_RUNNING(
+        label = "停止运行",
+        dialogTitle = "插入停止运行"
     );
 
     val supportsCoordinateCapture: Boolean
@@ -1441,6 +1446,7 @@ private enum class InsertOperationType(
             )
             BACK -> InsertOperationPayload("返回")
             HOME -> InsertOperationPayload("主页")
+            STOP_RUNNING -> InsertOperationPayload("停止运行")
         }
     }
 

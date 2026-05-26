@@ -61,6 +61,8 @@ data object BackActionNode : ActionNode
 
 data object HomeActionNode : ActionNode
 
+data object StopRunningActionNode : ActionNode
+
 data class RepeatControlNode(
     val count: ExpressionNode,
     val body: List<StatementNode>

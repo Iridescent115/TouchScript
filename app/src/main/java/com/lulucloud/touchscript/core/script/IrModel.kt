@@ -61,6 +61,8 @@ data object IrBackAction : IrAction
 
 data object IrHomeAction : IrAction
 
+data object IrStopRunningAction : IrAction
+
 data class IrRepeatInstruction(
     val count: IrExpression,
     val body: List<IrInstruction>
