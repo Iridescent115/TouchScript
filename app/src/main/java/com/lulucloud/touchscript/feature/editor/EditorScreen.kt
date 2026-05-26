@@ -1336,6 +1336,16 @@ private enum class InsertOperationGroup(
     val label: String,
     val operations: List<InsertOperationType>
 ) {
+    LOGIC(
+        label = "逻辑",
+        operations = listOf(
+            InsertOperationType.ASSIGN,
+            InsertOperationType.REPEAT,
+            InsertOperationType.FOREVER,
+            InsertOperationType.IF,
+            InsertOperationType.SLEEP
+        )
+    ),
     SIMULATION(
         label = "模拟操作",
         operations = listOf(
@@ -1353,14 +1363,11 @@ private enum class InsertOperationGroup(
             InsertOperationType.RECOGNIZE_REGION_TEXT
         )
     ),
-    LOGIC(
-        label = "逻辑",
+    CHARACTER_TOOLS(
+        label = "字符工具",
         operations = listOf(
-            InsertOperationType.ASSIGN,
-            InsertOperationType.REPEAT,
-            InsertOperationType.FOREVER,
-            InsertOperationType.IF,
-            InsertOperationType.SLEEP
+            InsertOperationType.TO_NUMBER,
+            InsertOperationType.TO_TEXT
         )
     ),
     SYSTEM(
@@ -1474,6 +1481,14 @@ private enum class InsertOperationType(
         defaultFieldC = "1080",
         defaultFieldD = "600"
     ),
+    TO_NUMBER(
+        label = "转数字",
+        dialogTitle = "插入转数字"
+    ),
+    TO_TEXT(
+        label = "转文本",
+        dialogTitle = "插入转文本"
+    ),
     ASSIGN(
         label = "设变量",
         dialogTitle = "插入设变量",
@@ -1576,6 +1591,12 @@ private enum class InsertOperationType(
                     记录 "未识别到文字"
                 结束如果
                 """.trimIndent()
+            )
+            TO_NUMBER -> InsertOperationPayload(
+                "转数字(\"123\")"
+            )
+            TO_TEXT -> InsertOperationPayload(
+                "转文本(123)"
             )
             ASSIGN -> InsertOperationPayload("设 ${fieldA.ifBlank { "变量" }} = ${fieldB.ifBlank { "0" }}")
             REPEAT -> InsertOperationPayload(

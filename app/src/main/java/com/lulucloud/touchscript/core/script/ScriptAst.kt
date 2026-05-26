@@ -110,6 +110,11 @@ data class MemberAccessExpressionNode(
     val propertyName: String
 ) : ExpressionNode
 
+data class ConversionExpressionNode(
+    val type: ConversionType,
+    val value: ExpressionNode
+) : ExpressionNode
+
 data class ImageFindExpressionNode(
     val imageName: ExpressionNode,
     val confidence: ExpressionNode
@@ -134,6 +139,11 @@ data class RegionTextRecognitionExpressionNode(
 enum class UnaryOperator {
     NOT,
     NEGATE
+}
+
+enum class ConversionType {
+    TO_NUMBER,
+    TO_TEXT
 }
 
 enum class BinaryOperator {

@@ -91,6 +91,23 @@ class ScriptCompilerTest {
     }
 
     @Test
+    fun `compile should support number and text conversion expressions`() {
+        val compiler = ScriptCompiler()
+
+        val result = compiler.compile(
+            """
+                设 数字1 = 转数字("123")
+                设 文本1 = 转文本(数字1)
+                记录 文本1
+            """.trimIndent()
+        )
+
+        assertTrue(result.luaSource.contains("""vars["数字1"] = tonumber("123")"""))
+        assertTrue(result.luaSource.contains("""vars["文本1"] = tostring(vars["数字1"])"""))
+        assertTrue(result.luaSource.contains("""log.info(vars["文本1"])"""))
+    }
+
+    @Test
     fun `compile should generate while true for forever loop`() {
         val compiler = ScriptCompiler()
 

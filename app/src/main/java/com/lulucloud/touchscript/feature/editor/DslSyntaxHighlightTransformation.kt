@@ -72,6 +72,8 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             "识图",
             "查找文字",
             "识别文字",
+            "转数字",
+            "转文本",
             "设",
             "无限循环",
             "循环",

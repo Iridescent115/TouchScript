@@ -82,6 +82,11 @@ class ScriptLowerer {
                 propertyName = expressionNode.propertyName
             )
 
+            is ConversionExpressionNode -> IrConversionExpression(
+                type = expressionNode.type,
+                value = lowerExpression(expressionNode.value)
+            )
+
             is ImageFindExpressionNode -> IrImageFindExpression(
                 imageName = lowerExpression(expressionNode.imageName),
                 confidence = lowerExpression(expressionNode.confidence)
@@ -220,6 +225,14 @@ class LuaGenerator {
 
             is IrMemberAccessExpression -> {
                 "__member(${renderExpression(expression.target)}, ${renderLuaString(mapMemberName(expression.propertyName))})"
+            }
+
+            is IrConversionExpression -> {
+                val functionName = when (expression.type) {
+                    ConversionType.TO_NUMBER -> "tonumber"
+                    ConversionType.TO_TEXT -> "tostring"
+                }
+                "$functionName(${renderExpression(expression.value)})"
             }
 
             is IrImageFindExpression -> {

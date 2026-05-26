@@ -242,13 +242,23 @@ internal class ExpressionParser(
             match(TokenType.FALSE) -> BooleanLiteralNode(false)
             match(TokenType.IDENTIFIER) -> {
                 val identifier = previous()
-                if (identifier.text == KEYWORD_IMAGE_FIND) {
-                    ImageFindExpressionNode(
+                when (identifier.text) {
+                    KEYWORD_IMAGE_FIND -> ImageFindExpressionNode(
                         imageName = parseUnary(),
                         confidence = parseOr()
                     )
-                } else {
-                    VariableReferenceNode(identifier.text)
+
+                    KEYWORD_TO_NUMBER -> parseConversionExpression(
+                        keyword = KEYWORD_TO_NUMBER,
+                        type = ConversionType.TO_NUMBER
+                    )
+
+                    KEYWORD_TO_TEXT -> parseConversionExpression(
+                        keyword = KEYWORD_TO_TEXT,
+                        type = ConversionType.TO_TEXT
+                    )
+
+                    else -> VariableReferenceNode(identifier.text)
                 }
             }
             match(TokenType.LEFT_PAREN) -> {
@@ -262,6 +272,16 @@ internal class ExpressionParser(
                 throw ScriptParseException("无法解析的表达式片段：${token.text}", lineNumber, token.column)
             }
         }
+    }
+
+    private fun parseConversionExpression(
+        keyword: String,
+        type: ConversionType
+    ): ConversionExpressionNode {
+        consume(TokenType.LEFT_PAREN, "$keyword 后必须使用括号，例如：$keyword(内容)")
+        val value = parseOr()
+        consume(TokenType.RIGHT_PAREN, "$keyword 缺少右括号")
+        return ConversionExpressionNode(type = type, value = value)
     }
 
     private fun consumeIdentifier(message: String): Token {
@@ -391,6 +411,8 @@ internal class ExpressionParser(
 
     private companion object {
         const val KEYWORD_IMAGE_FIND = "识图"
+        const val KEYWORD_TO_NUMBER = "转数字"
+        const val KEYWORD_TO_TEXT = "转文本"
         const val KEYWORD_FIND_TEXT = "查找文字"
         const val KEYWORD_RECOGNIZE_TEXT = "识别文字"
         const val KEYWORD_TEXT_RECOGNITION_LEGACY = "识文字"

@@ -108,6 +108,23 @@ class ScriptParserTest {
     }
 
     @Test
+    fun `parseDsl should support number and text conversion expressions`() {
+        val parser = ScriptParser()
+
+        val result = parser.parseDsl(
+            """
+                设 数字1 = 转数字("123")
+                设 文本1 = 转文本(数字1)
+            """.trimIndent()
+        )
+
+        val numberAssign = result.statements[0] as AssignActionNode
+        val textAssign = result.statements[1] as AssignActionNode
+        assertTrue(numberAssign.expression is ConversionExpressionNode)
+        assertTrue(textAssign.expression is ConversionExpressionNode)
+    }
+
+    @Test
     fun `parseDsl should support forever loop`() {
         val parser = ScriptParser()
 

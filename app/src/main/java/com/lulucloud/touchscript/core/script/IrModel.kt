@@ -110,6 +110,11 @@ data class IrMemberAccessExpression(
     val propertyName: String
 ) : IrExpression
 
+data class IrConversionExpression(
+    val type: ConversionType,
+    val value: IrExpression
+) : IrExpression
+
 data class IrImageFindExpression(
     val imageName: IrExpression,
     val confidence: IrExpression
