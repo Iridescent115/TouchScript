@@ -36,6 +36,15 @@ class ScriptParser {
             }
 
             when {
+                line.content == KEYWORD_FOREVER -> {
+                    val (body, nextIndex) = parseBlock(lines, index + 1, setOf(KEYWORD_REPEAT_END))
+                    if (nextIndex >= lines.size || lines[nextIndex].content != KEYWORD_REPEAT_END) {
+                        throw ScriptParseException("无限循环缺少结束循环", line.lineNumber)
+                    }
+                    statements += ForeverControlNode(body = body)
+                    index = nextIndex + 1
+                }
+
                 line.content.startsWith(KEYWORD_REPEAT_PREFIX) -> {
                     val repeatHead = line.content.removePrefix(KEYWORD_REPEAT_PREFIX)
                     if (!repeatHead.endsWith(KEYWORD_REPEAT_SUFFIX)) {
@@ -140,6 +149,15 @@ class ScriptParser {
                 LogActionNode(ExpressionParser(line.lineNumber).parse(expression))
             }
 
+            content.startsWith(KEYWORD_IMAGE_FIND) -> {
+                val args = tokenizeArguments(content.removePrefix(KEYWORD_IMAGE_FIND).trim(), line.lineNumber)
+                requireArgumentCount(args, 2, line)
+                ImageFindActionNode(
+                    imageUri = ExpressionParser(line.lineNumber).parse(args[0]),
+                    confidence = ExpressionParser(line.lineNumber).parse(args[1])
+                )
+            }
+
             content.startsWith(KEYWORD_ASSIGN) -> {
                 val statement = content.removePrefix(KEYWORD_ASSIGN).trim()
                 val equalsIndex = statement.indexOf('=')
@@ -222,12 +240,14 @@ class ScriptParser {
         const val KEYWORD_SLEEP = "等待 "
         const val KEYWORD_LAUNCH_APP = "启动应用 "
         const val KEYWORD_LOG = "记录 "
+        const val KEYWORD_IMAGE_FIND = "识图 "
         const val KEYWORD_ASSIGN = "设 "
         const val KEYWORD_BACK = "返回"
         const val KEYWORD_HOME = "主页"
         const val KEYWORD_REPEAT_PREFIX = "循环 "
         const val KEYWORD_REPEAT_SUFFIX = " 次"
         const val KEYWORD_REPEAT_END = "结束循环"
+        const val KEYWORD_FOREVER = "无限循环"
         const val KEYWORD_IF_PREFIX = "如果 "
         const val KEYWORD_ELSE = "否则"
         const val KEYWORD_IF_END = "结束如果"

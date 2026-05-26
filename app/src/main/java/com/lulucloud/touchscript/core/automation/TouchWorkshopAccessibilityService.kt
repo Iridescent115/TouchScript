@@ -3,7 +3,10 @@ package com.lulucloud.touchscript.core.automation
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Path
+import android.os.Build
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -50,6 +53,36 @@ class TouchWorkshopAccessibilityService : AccessibilityService() {
     fun back(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
 
     fun home(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
+
+    suspend fun takeScreenshotBitmap(): Bitmap? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                mainExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        val hardwareBuffer = screenshot.hardwareBuffer
+                        val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshot.colorSpace)
+                            ?.copy(Bitmap.Config.ARGB_8888, false)
+                        hardwareBuffer.close()
+                        if (continuation.isActive) {
+                            continuation.resume(bitmap)
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {
+                        if (continuation.isActive) {
+                            continuation.resume(null)
+                        }
+                    }
+                }
+            )
+        }
+    }
 
     fun launchApp(packageName: String): Boolean {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return false

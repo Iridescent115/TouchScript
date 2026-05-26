@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.room.Room
 import com.lulucloud.touchscript.core.automation.AccessibilityAutomationExecutor
 import com.lulucloud.touchscript.core.automation.AutomationSessionManager
+import com.lulucloud.touchscript.core.runtime.ImageMatcher
 import com.lulucloud.touchscript.core.runtime.LuaHostBridge
 import com.lulucloud.touchscript.core.runtime.ScriptRuntime
 import com.lulucloud.touchscript.core.script.ScriptCompiler
@@ -37,10 +38,11 @@ class AppContainer(
     val sessionManager = AutomationSessionManager(scriptRepository)
     val scriptCompiler = ScriptCompiler()
     val automationExecutor = AccessibilityAutomationExecutor(application, sessionManager)
+    val imageMatcher = ImageMatcher(application, fileScriptRepository, settingsRepository)
     val scriptRuntime = ScriptRuntime(
         scriptRepository = scriptRepository,
         scriptCompiler = scriptCompiler,
-        luaHostBridge = LuaHostBridge(automationExecutor, sessionManager),
+        luaHostBridge = LuaHostBridge(automationExecutor, sessionManager, imageMatcher),
         sessionManager = sessionManager
     )
 

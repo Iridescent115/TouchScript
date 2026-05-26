@@ -43,6 +43,11 @@ data class IrLogAction(
     val message: IrExpression
 ) : IrAction
 
+data class IrImageFindAction(
+    val imageUri: IrExpression,
+    val confidence: IrExpression
+) : IrAction
+
 data class IrAssignAction(
     val variableName: String,
     val expression: IrExpression
@@ -57,6 +62,10 @@ data class IrRepeatInstruction(
     val body: List<IrInstruction>
 ) : IrControlFlow
 
+data class IrForeverInstruction(
+    val body: List<IrInstruction>
+) : IrControlFlow
+
 data class IrIfInstruction(
     val condition: IrExpression,
     val thenBranch: List<IrInstruction>,
@@ -64,7 +73,7 @@ data class IrIfInstruction(
 ) : IrControlFlow
 
 data class IrNumberLiteral(
-    val value: Long
+    val value: Double
 ) : IrExpression
 
 data class IrBooleanLiteral(
@@ -88,4 +97,14 @@ data class IrBinaryExpression(
     val left: IrExpression,
     val operator: BinaryOperator,
     val right: IrExpression
+) : IrExpression
+
+data class IrMemberAccessExpression(
+    val target: IrExpression,
+    val propertyName: String
+) : IrExpression
+
+data class IrImageFindExpression(
+    val imageName: IrExpression,
+    val confidence: IrExpression
 ) : IrExpression

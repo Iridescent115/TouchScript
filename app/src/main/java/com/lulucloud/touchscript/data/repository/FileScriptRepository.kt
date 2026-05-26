@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -122,6 +123,58 @@ class FileScriptRepository(
         scriptWorkspaceUri.toString()
     }
 
+    suspend fun importRecognitionImage(
+        sourceLocation: String,
+        workspaceUri: String,
+        preferredFileName: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        val sourceUri = Uri.parse(sourceLocation)
+        val sourceName = queryDisplayName(sourceUri)
+        val mimeType = context.contentResolver.getType(sourceUri) ?: "image/*"
+        val fileName = normalizeImageFileName(
+            preferredFileName ?: sourceName ?: "识图_${System.currentTimeMillis()}.${extensionFromMimeType(mimeType)}"
+        )
+        val imagesDirectoryUri = ensureRecognitionImagesDirectoryUri(workspaceUri)
+        val targetUri = findChildByName(
+            parentDirectoryUri = imagesDirectoryUri,
+            targetName = fileName,
+            targetMimeType = null
+        ) ?: DocumentsContract.createDocument(
+            context.contentResolver,
+            imagesDirectoryUri,
+            mimeType,
+            fileName
+        ) ?: error("无法创建识图图片：$fileName")
+
+        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { output ->
+                input.copyTo(output)
+            } ?: error("无法写入识图图片：$fileName")
+        } ?: error("无法读取选择的图片")
+
+        fileName
+    }
+
+    suspend fun ensureRecognitionImagesDirectory(workspaceUri: String): String = withContext(Dispatchers.IO) {
+        ensureRecognitionImagesDirectoryUri(workspaceUri).toString()
+    }
+
+    suspend fun resolveRecognitionImageUri(imageName: String, workspaceUri: String): Uri? = withContext(Dispatchers.IO) {
+        val normalizedName = normalizeImageFileName(imageName)
+        val workspaceDocumentUri = Uri.parse(workspaceUri)
+        val imagesDirectoryUri = findChildByName(
+            parentDirectoryUri = workspaceDocumentUri,
+            targetName = RECOGNITION_IMAGES_DIR_NAME,
+            targetMimeType = DocumentsContract.Document.MIME_TYPE_DIR
+        ) ?: return@withContext null
+
+        findChildByName(
+            parentDirectoryUri = imagesDirectoryUri,
+            targetName = normalizedName,
+            targetMimeType = null
+        )
+    }
+
     suspend fun duplicateScript(sourcePath: String, newName: String, isTemplate: Boolean = false): LocalScriptFile {
         val source = readFile(sourcePath)
         return saveScript(newName, source.content, path = null, isTemplate = isTemplate)
@@ -217,10 +270,14 @@ class FileScriptRepository(
         ) ?: error("无法创建目录：$targetName")
     }
 
+    private fun ensureRecognitionImagesDirectoryUri(workspaceUri: String): Uri {
+        return ensureDirectory(Uri.parse(workspaceUri), RECOGNITION_IMAGES_DIR_NAME)
+    }
+
     private fun findChildByName(
         parentDirectoryUri: Uri,
         targetName: String,
-        targetMimeType: String
+        targetMimeType: String?
     ): Uri? {
         val parentDocumentId = DocumentsContract.getDocumentId(parentDirectoryUri)
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(parentDirectoryUri, parentDocumentId)
@@ -241,7 +298,7 @@ class FileScriptRepository(
             while (cursor.moveToNext()) {
                 val displayName = if (nameIndex >= 0) cursor.getString(nameIndex) else null
                 val mimeType = if (mimeIndex >= 0) cursor.getString(mimeIndex) else null
-                if (displayName == targetName && mimeType == targetMimeType) {
+                if (displayName == targetName && (targetMimeType == null || mimeType == targetMimeType)) {
                     val documentId = cursor.getString(idIndex)
                     return DocumentsContract.buildDocumentUriUsingTree(parentDirectoryUri, documentId)
                 }
@@ -263,10 +320,23 @@ class FileScriptRepository(
             .replace(Regex("[\\\\/:*?\"<>|]"), "_")
     }
 
+    private fun normalizeImageFileName(name: String): String {
+        return name.trim()
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .ifBlank { "未命名图片.png" }
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+    }
+
+    private fun extensionFromMimeType(mimeType: String): String {
+        return MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)?.takeIf { it.isNotBlank() } ?: "png"
+    }
+
     private fun isContentUri(path: String): Boolean = path.startsWith("content://")
 
     private companion object {
         const val SCRIPT_WORKSPACE_DIR_NAME = "TouchScript"
+        const val RECOGNITION_IMAGES_DIR_NAME = "Images"
     }
 }
 

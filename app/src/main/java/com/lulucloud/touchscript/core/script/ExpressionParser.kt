@@ -25,6 +25,7 @@ private enum class TokenType {
     AND,
     OR,
     NOT,
+    DOT,
     LEFT_PAREN,
     RIGHT_PAREN,
     EOF
@@ -63,6 +64,15 @@ internal class ExpressionParser(
                     val start = index
                     while (index < expression.length && expression[index].isDigit()) {
                         index += 1
+                    }
+                    if (index < expression.length && expression[index] == '.') {
+                        index += 1
+                        if (index >= expression.length || !expression[index].isDigit()) {
+                            throw ScriptParseException("小数点后必须跟数字", lineNumber, index)
+                        }
+                        while (index < expression.length && expression[index].isDigit()) {
+                            index += 1
+                        }
                     }
                     result += Token(
                         type = TokenType.NUMBER,
@@ -123,6 +133,7 @@ internal class ExpressionParser(
                             '>' -> Token(TokenType.GT, ">", index + 1)
                             '<' -> Token(TokenType.LT, "<", index + 1)
                             '!' -> Token(TokenType.NOT, "!", index + 1)
+                            '.' -> Token(TokenType.DOT, ".", index + 1)
                             '(' -> Token(TokenType.LEFT_PAREN, "(", index + 1)
                             ')' -> Token(TokenType.RIGHT_PAREN, ")", index + 1)
                             else -> throw ScriptParseException(
@@ -209,17 +220,36 @@ internal class ExpressionParser(
         return when {
             match(TokenType.NOT) -> UnaryExpressionNode(UnaryOperator.NOT, parseUnary())
             match(TokenType.MINUS) -> UnaryExpressionNode(UnaryOperator.NEGATE, parseUnary())
-            else -> parsePrimary()
+            else -> parsePostfix()
         }
+    }
+
+    private fun parsePostfix(): ExpressionNode {
+        var expression = parsePrimary()
+        while (match(TokenType.DOT)) {
+            val property = consumeIdentifier("点号后必须跟属性名")
+            expression = MemberAccessExpressionNode(expression, property.text)
+        }
+        return expression
     }
 
     private fun parsePrimary(): ExpressionNode {
         return when {
-            match(TokenType.NUMBER) -> NumberLiteralNode(previous().text.toLong())
+            match(TokenType.NUMBER) -> NumberLiteralNode(previous().text.toDouble())
             match(TokenType.STRING) -> StringLiteralNode(previous().text)
             match(TokenType.TRUE) -> BooleanLiteralNode(true)
             match(TokenType.FALSE) -> BooleanLiteralNode(false)
-            match(TokenType.IDENTIFIER) -> VariableReferenceNode(previous().text)
+            match(TokenType.IDENTIFIER) -> {
+                val identifier = previous()
+                if (identifier.text == KEYWORD_IMAGE_FIND) {
+                    ImageFindExpressionNode(
+                        imageName = parseUnary(),
+                        confidence = parseOr()
+                    )
+                } else {
+                    VariableReferenceNode(identifier.text)
+                }
+            }
             match(TokenType.LEFT_PAREN) -> {
                 val expression = parseOr()
                 consume(TokenType.RIGHT_PAREN, "缺少右括号")
@@ -231,6 +261,14 @@ internal class ExpressionParser(
                 throw ScriptParseException("无法解析的表达式片段：${token.text}", lineNumber, token.column)
             }
         }
+    }
+
+    private fun consumeIdentifier(message: String): Token {
+        if (check(TokenType.IDENTIFIER)) {
+            return advance()
+        }
+        val token = peek()
+        throw ScriptParseException(message, lineNumber, token.column)
     }
 
     private fun consume(type: TokenType, message: String) {
@@ -268,4 +306,8 @@ internal class ExpressionParser(
     private fun isIdentifierStart(char: Char): Boolean = char == '_' || char.isLetter() || char.code > 127
 
     private fun isIdentifierPart(char: Char): Boolean = isIdentifierStart(char) || char.isDigit()
+
+    private companion object {
+        const val KEYWORD_IMAGE_FIND = "识图"
+    }
 }

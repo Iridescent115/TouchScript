@@ -30,6 +30,10 @@ class ScriptLowerer {
             is SleepActionNode -> IrSleepAction(lowerExpression(statement.durationMs))
             is LaunchAppActionNode -> IrLaunchAppAction(lowerExpression(statement.packageName))
             is LogActionNode -> IrLogAction(lowerExpression(statement.message))
+            is ImageFindActionNode -> IrImageFindAction(
+                imageUri = lowerExpression(statement.imageUri),
+                confidence = lowerExpression(statement.confidence)
+            )
             is AssignActionNode -> IrAssignAction(
                 variableName = statement.variableName,
                 expression = lowerExpression(statement.expression)
@@ -39,6 +43,10 @@ class ScriptLowerer {
             HomeActionNode -> IrHomeAction
             is RepeatControlNode -> IrRepeatInstruction(
                 count = lowerExpression(statement.count),
+                body = statement.body.map(::lowerInstruction)
+            )
+
+            is ForeverControlNode -> IrForeverInstruction(
                 body = statement.body.map(::lowerInstruction)
             )
 
@@ -66,6 +74,16 @@ class ScriptLowerer {
                 operator = expressionNode.operator,
                 right = lowerExpression(expressionNode.right)
             )
+
+            is MemberAccessExpressionNode -> IrMemberAccessExpression(
+                target = lowerExpression(expressionNode.target),
+                propertyName = expressionNode.propertyName
+            )
+
+            is ImageFindExpressionNode -> IrImageFindExpression(
+                imageName = lowerExpression(expressionNode.imageName),
+                confidence = lowerExpression(expressionNode.confidence)
+            )
         }
     }
 }
@@ -75,6 +93,10 @@ class LuaGenerator {
     fun generateLua(ir: IrProgram): String {
         val builder = StringBuilder()
         builder.appendLine("local vars = {}")
+        builder.appendLine("local function __member(value, key)")
+        builder.appendLine("    if value == nil then return nil end")
+        builder.appendLine("    return value[key]")
+        builder.appendLine("end")
         ir.instructions.forEach { appendInstruction(builder, it, 0) }
         return builder.toString().trim()
     }
@@ -106,6 +128,10 @@ class LuaGenerator {
                 "${indent}log.info(${renderExpression(instruction.message)})"
             )
 
+            is IrImageFindAction -> builder.appendLine(
+                "${indent}image.requireFind(${renderExpression(instruction.imageUri)}, ${renderExpression(instruction.confidence)})"
+            )
+
             is IrAssignAction -> builder.appendLine(
                 "${indent}vars[${renderLuaString(instruction.variableName)}] = ${renderExpression(instruction.expression)}"
             )
@@ -114,6 +140,12 @@ class LuaGenerator {
             IrHomeAction -> builder.appendLine("${indent}device.home()")
             is IrRepeatInstruction -> {
                 builder.appendLine("${indent}for __index = 1, ${renderExpression(instruction.count)} do")
+                instruction.body.forEach { appendInstruction(builder, it, indentLevel + 1) }
+                builder.appendLine("${indent}end")
+            }
+
+            is IrForeverInstruction -> {
+                builder.appendLine("${indent}while true do")
                 instruction.body.forEach { appendInstruction(builder, it, indentLevel + 1) }
                 builder.appendLine("${indent}end")
             }
@@ -132,7 +164,7 @@ class LuaGenerator {
 
     private fun renderExpression(expression: IrExpression): String {
         return when (expression) {
-            is IrNumberLiteral -> expression.value.toString()
+            is IrNumberLiteral -> renderNumber(expression.value)
             is IrBooleanLiteral -> if (expression.value) "true" else "false"
             is IrStringLiteral -> renderLuaString(expression.value)
             is IrVariableReference -> "vars[${renderLuaString(expression.name)}]"
@@ -160,7 +192,30 @@ class LuaGenerator {
                 }
                 "($left $operator $right)"
             }
+
+            is IrMemberAccessExpression -> {
+                "__member(${renderExpression(expression.target)}, ${renderLuaString(mapMemberName(expression.propertyName))})"
+            }
+
+            is IrImageFindExpression -> {
+                "image.find(${renderExpression(expression.imageName)}, ${renderExpression(expression.confidence)})"
+            }
         }
+    }
+
+    private fun mapMemberName(propertyName: String): String {
+        return when (propertyName) {
+            "找到", "found" -> "found"
+            "置信度", "分数", "score" -> "score"
+            "x", "X" -> "x"
+            "y", "Y" -> "y"
+            else -> propertyName
+        }
+    }
+
+    private fun renderNumber(value: Double): String {
+        val longValue = value.toLong()
+        return if (value == longValue.toDouble()) longValue.toString() else value.toString()
     }
 
     private fun renderLuaString(value: String): String = "\"${value.replace("\"", "\\\"")}\""

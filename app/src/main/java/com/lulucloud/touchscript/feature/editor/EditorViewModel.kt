@@ -1,5 +1,6 @@
 package com.lulucloud.touchscript.feature.editor
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lulucloud.touchscript.core.automation.DebugScriptDraft
@@ -144,6 +145,36 @@ class EditorViewModel(
             settingsRepository.setScriptWorkspaceUri(workspaceUri)
             _uiState.value = _uiState.value.copy(scriptWorkspaceUri = workspaceUri)
             onReady(workspaceUri)
+        }
+    }
+
+    fun importRecognitionImage(sourceUri: Uri, fileName: String, onResult: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            val workspaceUri = _uiState.value.scriptWorkspaceUri
+            if (workspaceUri.isNullOrBlank()) {
+                onResult(Result.failure(IllegalStateException("请先在“文件”菜单中设置脚本目录")))
+                return@launch
+            }
+
+            val result = runCatching {
+                fileScriptRepository.importRecognitionImage(sourceUri.toString(), workspaceUri, fileName)
+            }
+            onResult(result)
+        }
+    }
+
+    fun ensureRecognitionImagesDirectory(onResult: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            val workspaceUri = _uiState.value.scriptWorkspaceUri
+            if (workspaceUri.isNullOrBlank()) {
+                onResult(Result.failure(IllegalStateException("请先在“文件”菜单中设置脚本目录")))
+                return@launch
+            }
+
+            val result = runCatching {
+                fileScriptRepository.ensureRecognitionImagesDirectory(workspaceUri)
+            }
+            onResult(result)
         }
     }
 

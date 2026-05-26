@@ -43,6 +43,11 @@ data class LogActionNode(
     val message: ExpressionNode
 ) : ActionNode
 
+data class ImageFindActionNode(
+    val imageUri: ExpressionNode,
+    val confidence: ExpressionNode
+) : ActionNode
+
 data class AssignActionNode(
     val variableName: String,
     val expression: ExpressionNode
@@ -57,6 +62,10 @@ data class RepeatControlNode(
     val body: List<StatementNode>
 ) : ControlFlowNode
 
+data class ForeverControlNode(
+    val body: List<StatementNode>
+) : ControlFlowNode
+
 data class IfControlNode(
     val condition: ExpressionNode,
     val thenBranch: List<StatementNode>,
@@ -64,7 +73,7 @@ data class IfControlNode(
 ) : ControlFlowNode
 
 data class NumberLiteralNode(
-    val value: Long
+    val value: Double
 ) : ExpressionNode
 
 data class BooleanLiteralNode(
@@ -88,6 +97,16 @@ data class BinaryExpressionNode(
     val left: ExpressionNode,
     val operator: BinaryOperator,
     val right: ExpressionNode
+) : ExpressionNode
+
+data class MemberAccessExpressionNode(
+    val target: ExpressionNode,
+    val propertyName: String
+) : ExpressionNode
+
+data class ImageFindExpressionNode(
+    val imageName: ExpressionNode,
+    val confidence: ExpressionNode
 ) : ExpressionNode
 
 enum class UnaryOperator {

@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -565,6 +567,12 @@ fun EditorScreen(viewModel: EditorViewModel) {
     selectedInsertOperation?.let { operation ->
         InsertOperationDialog(
             operation = operation,
+            onImportImage = { uri, fileName, onResult ->
+                viewModel.importRecognitionImage(uri, fileName, onResult)
+            },
+            onEnsureImagesDirectory = { onResult ->
+                viewModel.ensureRecognitionImagesDirectory(onResult)
+            },
             onDismiss = { selectedInsertOperation = null },
             onInsert = { insertion ->
                 val updated = insertSnippetAtSelection(
@@ -618,6 +626,8 @@ private fun EditorDropdownMenu(
 @Composable
 private fun InsertOperationDialog(
     operation: InsertOperationType,
+    onImportImage: (Uri, String, (Result<String>) -> Unit) -> Unit,
+    onEnsureImagesDirectory: ((Result<String>) -> Unit) -> Unit,
     onDismiss: () -> Unit,
     onInsert: (InsertOperationPayload) -> Unit
 ) {
@@ -628,6 +638,27 @@ private fun InsertOperationDialog(
     var fieldD by remember(operation) { mutableStateOf(operation.defaultFieldD) }
     var fieldE by remember(operation) { mutableStateOf(operation.defaultFieldE) }
     var activeCaptureRequestId by remember(operation) { mutableStateOf<Long?>(null) }
+    var pendingPreprocessUri by remember(operation) { mutableStateOf<Uri?>(null) }
+    var pendingPreprocessName by remember(operation) { mutableStateOf("") }
+    val imagePreprocessLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            pendingPreprocessUri = uri
+            pendingPreprocessName = context.queryDisplayName(uri)
+                ?: "识图_${System.currentTimeMillis()}.jpg"
+        }
+    }
+    val imageFilePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            val fileName = context.queryDisplayName(uri)
+            if (fileName.isNullOrBlank()) {
+                Toast.makeText(context, "无法读取图片文件名", Toast.LENGTH_SHORT).show()
+            } else {
+                fieldA = fileName
+            }
+        }
+    }
 
     LaunchedEffect(operation, activeCaptureRequestId) {
         if (activeCaptureRequestId == null) {
@@ -677,12 +708,46 @@ private fun InsertOperationDialog(
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     operation.fieldLabelA?.let {
-                        OutlinedTextField(
-                            value = fieldA,
-                            onValueChange = { value -> fieldA = value },
-                            label = { Text(it) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (operation.supportsImagePicker) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = fieldA,
+                                    onValueChange = { value -> fieldA = value },
+                                    label = { Text(it) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(
+                                    onClick = {
+                                        onEnsureImagesDirectory { result ->
+                                            result
+                                                .onSuccess { imagesUri ->
+                                                    imageFilePickerLauncher.launch(buildOpenImageFileIntent(imagesUri))
+                                                }
+                                                .onFailure { throwable ->
+                                                    Toast.makeText(
+                                                        context,
+                                                        throwable.message ?: "无法打开 Images 文件夹",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                        }
+                                    }
+                                ) {
+                                    Text("选择")
+                                }
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value = fieldA,
+                                onValueChange = { value -> fieldA = value },
+                                label = { Text(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                     operation.fieldLabelB?.let {
                         OutlinedTextField(
@@ -722,7 +787,15 @@ private fun InsertOperationDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (operation.supportsCoordinateCapture) {
+                    if (operation.supportsImagePicker) {
+                        TextButton(
+                            onClick = {
+                                imagePreprocessLauncher.launch(buildPickImageFromGalleryIntent())
+                            }
+                        ) {
+                            Text("图片预处理")
+                        }
+                    } else if (operation.supportsCoordinateCapture) {
                         TextButton(
                             onClick = {
                                 val request = operation.createCaptureRequest() ?: return@TextButton
@@ -758,6 +831,64 @@ private fun InsertOperationDialog(
             }
         }
     }
+
+    pendingPreprocessUri?.let { sourceUri ->
+        ImageFileNameDialog(
+            title = "保存识图图片",
+            initialName = pendingPreprocessName,
+            onDismiss = {
+                pendingPreprocessUri = null
+                pendingPreprocessName = ""
+            },
+            onConfirm = { targetName ->
+                onImportImage(sourceUri, targetName) { result ->
+                    result
+                        .onSuccess { fileName ->
+                            fieldA = fileName
+                            Toast.makeText(context, "已保存到 Images：$fileName", Toast.LENGTH_SHORT).show()
+                        }
+                        .onFailure { throwable ->
+                            Toast.makeText(context, throwable.message ?: "保存识图图片失败", Toast.LENGTH_SHORT).show()
+                        }
+                }
+                pendingPreprocessUri = null
+                pendingPreprocessName = ""
+            }
+        )
+    }
+}
+
+@Composable
+private fun ImageFileNameDialog(
+    title: String,
+    initialName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var fileName by remember(initialName) { mutableStateOf(initialName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = fileName,
+                onValueChange = { fileName = it },
+                label = { Text("图片文件名") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(fileName.ifBlank { "未命名图片.jpg" }) }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 @Composable
@@ -1036,6 +1167,7 @@ private fun shouldIncreaseIndentAfterLine(text: String, cursor: Int): Boolean {
     }
     return when {
         line.startsWith("循环 ") && line.endsWith("次") -> true
+        line == "无限循环" -> true
         line.startsWith("如果 ") -> true
         line == "否则" -> true
         else -> false
@@ -1075,6 +1207,37 @@ private fun buildOpenScriptTreeIntent(): Intent {
     }
 }
 
+private fun buildPickImageFromGalleryIntent(): Intent {
+    return Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+        type = "image/*"
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+}
+
+private fun buildOpenImageFileIntent(initialUri: String?): Intent {
+    return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "image/*"
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        initialUri?.let {
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(it))
+        }
+    }
+}
+
+private fun android.content.Context.queryDisplayName(uri: Uri): String? {
+    return contentResolver.query(
+        uri,
+        arrayOf(OpenableColumns.DISPLAY_NAME),
+        null,
+        null,
+        null
+    )?.use { cursor ->
+        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+    }
+}
+
 private fun buildDefaultTouchScriptDocumentUri(): Uri {
     return DocumentsContract.buildDocumentUri(
         EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
@@ -1111,11 +1274,18 @@ private enum class InsertOperationGroup(
             InsertOperationType.SWIPE
         )
     ),
+    IMAGE(
+        label = "识图",
+        operations = listOf(
+            InsertOperationType.IMAGE_FIND
+        )
+    ),
     LOGIC(
         label = "逻辑",
         operations = listOf(
             InsertOperationType.ASSIGN,
             InsertOperationType.REPEAT,
+            InsertOperationType.FOREVER,
             InsertOperationType.IF,
             InsertOperationType.SLEEP
         )
@@ -1195,6 +1365,13 @@ private enum class InsertOperationType(
         fieldLabelA = "日志文本",
         defaultFieldA = "开始执行"
     ),
+    IMAGE_FIND(
+        label = "识图",
+        dialogTitle = "插入识图",
+        fieldLabelA = "图片文件名",
+        fieldLabelB = "置信度(0-1)",
+        defaultFieldB = "0.85"
+    ),
     ASSIGN(
         label = "设变量",
         dialogTitle = "插入设变量",
@@ -1208,6 +1385,10 @@ private enum class InsertOperationType(
         dialogTitle = "插入循环",
         fieldLabelA = "循环次数",
         defaultFieldA = "3"
+    ),
+    FOREVER(
+        label = "无限循环",
+        dialogTitle = "插入无限循环"
     ),
     IF(
         label = "如果",
@@ -1227,6 +1408,9 @@ private enum class InsertOperationType(
     val supportsCoordinateCapture: Boolean
         get() = this == CLICK || this == LONG_PRESS || this == SWIPE
 
+    val supportsImagePicker: Boolean
+        get() = this == IMAGE_FIND
+
     fun buildInsertion(
         fieldA: String,
         fieldB: String,
@@ -1241,9 +1425,26 @@ private enum class InsertOperationType(
             SLEEP -> InsertOperationPayload("等待 ${fieldA.ifBlank { "500" }}")
             LAUNCH_APP -> InsertOperationPayload("启动应用 \"${sanitizeQuotedText(fieldA.ifBlank { "com.android.settings" })}\"")
             LOG -> InsertOperationPayload("记录 \"${sanitizeQuotedText(fieldA.ifBlank { "开始执行" })}\"")
+            IMAGE_FIND -> {
+                val imageName = sanitizeQuotedText(fieldA.ifBlank { "请选择图片.png" })
+                InsertOperationPayload(
+                    """
+                    设 结果1 = 识图 "$imageName" ${fieldB.ifBlank { "0.85" }}
+                    如果 结果1.找到
+                        点击 结果1.x 结果1.y
+                    否则
+                        记录 "未找到：$imageName"
+                    结束如果
+                    """.trimIndent()
+                )
+            }
             ASSIGN -> InsertOperationPayload("设 ${fieldA.ifBlank { "变量" }} = ${fieldB.ifBlank { "0" }}")
             REPEAT -> InsertOperationPayload(
                 snippet = "循环 ${fieldA.ifBlank { "3" }} 次\n$INSERT_CURSOR_MARKER\n结束循环",
+                placeCursorAtMarker = true
+            )
+            FOREVER -> InsertOperationPayload(
+                snippet = "无限循环\n$INSERT_CURSOR_MARKER\n结束循环",
                 placeCursorAtMarker = true
             )
             IF -> InsertOperationPayload(

@@ -33,7 +33,7 @@ class AutomationRunnerService : LifecycleService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_SHOW_OVERLAY -> showOverlay()
-            ACTION_HIDE_OVERLAY -> hideOverlay()
+            ACTION_HIDE_OVERLAY -> lifecycleScope.launch { stopExecutionAndHideOverlay() }
             ACTION_TOGGLE_START_STOP -> lifecycleScope.launch { toggleStartStop() }
             ACTION_TOGGLE_PAUSE -> lifecycleScope.launch { appContainer().sessionManager.togglePause() }
             ACTION_STOP -> lifecycleScope.launch { stopExecutionByUser() }
@@ -151,6 +151,17 @@ class AutomationRunnerService : LifecycleService() {
         } else {
             updateNotification("悬浮窗已启用")
         }
+    }
+
+    private suspend fun stopExecutionAndHideOverlay() {
+        val status = appContainer().sessionManager.sessionState.value.status
+        val isRunning = status == SessionStatus.RUNNING || status == SessionStatus.PAUSED
+        if (currentJob != null || isRunning) {
+            appContainer().sessionManager.requestStop("用户退出悬浮窗，已停止当前脚本")
+            currentJob?.cancel()
+            currentJob = null
+        }
+        hideOverlay()
     }
 
     private fun observeSession() {
