@@ -142,8 +142,8 @@ fun TouchWorkshopApp(
     if (appSettings.scriptWorkspaceUri.isNullOrBlank() && !workspaceDialogDismissed) {
         AlertDialog(
             onDismissRequest = { workspaceDialogDismissed = true },
-            title = { Text("初始化脚本目录") },
-            text = { Text("首次使用需要选择一个脚本工作目录。你选择哪个文件夹，触灵工坊就直接在该文件夹下保存脚本和识图素材。") },
+            title = { Text("选择工作目录") },
+            text = { Text("需选择一个工作目录，用于保存脚本和识图素材\n建议选择/Documents/TouchScript路径") },
             confirmButton = {
                 TextButton(
                     onClick = {

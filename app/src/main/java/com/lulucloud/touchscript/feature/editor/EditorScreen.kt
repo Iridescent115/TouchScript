@@ -424,18 +424,6 @@ fun EditorScreen(viewModel: EditorViewModel) {
                         .background(editorBackground)
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    if (editorValue.text.isBlank()) {
-                        Text(
-                            text = "记录 \"开始执行\"\n点击 540 1600",
-                            style = TextStyle(
-                                color = Color(0xFF5A6E83),
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 14.sp,
-                                lineHeight = 22.sp
-                            )
-                        )
-                    }
-
                     BasicTextField(
                         value = editorValue,
                         onValueChange = { value ->

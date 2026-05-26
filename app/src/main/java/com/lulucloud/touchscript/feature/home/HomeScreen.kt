@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBarsPadding
 import com.lulucloud.touchscript.common.AutomationLauncher
 import com.lulucloud.touchscript.data.repository.LocalScriptFile
@@ -74,6 +75,18 @@ fun HomeScreen(
                 )
             )
     ) {
+        Text(
+            text = "触灵工坊",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontSize = 32.sp,
+                letterSpacing = 2.sp
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 24.dp, top = 28.dp)
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
