@@ -280,6 +280,19 @@ fun EditorScreen(viewModel: EditorViewModel) {
                         )
                     }
                     EditorDropdownMenu(
+                        text = "编辑",
+                        expanded = showEditMenu,
+                        onExpandedChange = { showEditMenu = it }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("撤销") },
+                            onClick = {
+                                showEditMenu = false
+                                viewModel.undo()
+                            }
+                        )
+                    }
+                    EditorDropdownMenu(
                         text = "插入操作",
                         expanded = showInsertMenu,
                         onExpandedChange = {
@@ -326,19 +339,6 @@ fun EditorScreen(viewModel: EditorViewModel) {
                                 }
                             }
                         }
-                    }
-                    EditorDropdownMenu(
-                        text = "编辑",
-                        expanded = showEditMenu,
-                        onExpandedChange = { showEditMenu = it }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("撤销") },
-                            onClick = {
-                                showEditMenu = false
-                                viewModel.undo()
-                            }
-                        )
                     }
                 }
             }
