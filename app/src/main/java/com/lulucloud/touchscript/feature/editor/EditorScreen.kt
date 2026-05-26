@@ -15,13 +15,18 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -50,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -71,6 +77,7 @@ import com.lulucloud.touchscript.core.automation.CoordinateCaptureService
 fun EditorScreen(viewModel: EditorViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val density = LocalDensity.current
     var editorValue by remember { mutableStateOf(TextFieldValue(uiState.currentSource)) }
     val editorScroll = rememberScrollState()
     val resultScroll = rememberScrollState()
@@ -362,43 +369,46 @@ fun EditorScreen(viewModel: EditorViewModel) {
             }
         }
 
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            Box(
-                modifier = Modifier
-                    .width(36.dp)
-                    .fillMaxHeight()
-                    .background(gutterBackground)
-                    .verticalScroll(editorScroll)
-                    .padding(horizontal = 2.dp, vertical = 12.dp),
-                contentAlignment = Alignment.TopEnd
-            ) {
-                Text(
-                    text = buildLineNumbers(uiState.currentSource),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = Color(0xFF627287),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp
-                    )
+            val keyboardBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+            val scrollContentMinHeight = maxHeight + keyboardBottomPadding + 320.dp
+            val cursorLineIndex = remember(editorValue.text, editorValue.selection.start) {
+                cursorLineIndex(
+                    text = editorValue.text,
+                    cursor = editorValue.selection.start
                 )
             }
 
-            Box(
+            LaunchedEffect(cursorLineIndex, keyboardBottomPadding, editorScroll.maxValue) {
+                if (keyboardBottomPadding > 0.dp) {
+                    val target = with(density) {
+                        (cursorLineIndex * EDITOR_LINE_HEIGHT_SP.sp.toPx() - 140.dp.toPx()).toInt()
+                    }.coerceIn(0, editorScroll.maxValue)
+                    editorScroll.animateScrollTo(target)
+                }
+            }
+
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(editorBackground)
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                    .fillMaxSize()
+                    .verticalScroll(editorScroll)
             ) {
-                if (editorValue.text.isBlank()) {
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(scrollContentMinHeight)
+                        .background(gutterBackground)
+                        .padding(horizontal = 2.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.TopEnd
+                ) {
                     Text(
-                        text = "记录 \"开始执行\"\n点击 540 1600",
-                        style = TextStyle(
-                            color = Color(0xFF5A6E83),
+                        text = buildLineNumbers(uiState.currentSource),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = Color(0xFF627287),
                             fontFamily = FontFamily.Monospace,
                             fontSize = 14.sp,
                             lineHeight = 22.sp
@@ -406,27 +416,47 @@ fun EditorScreen(viewModel: EditorViewModel) {
                     )
                 }
 
-                BasicTextField(
-                    value = editorValue,
-                    onValueChange = { value ->
-                        val nextValue = applyEditorInputBehaviors(
-                            previousValue = editorValue,
-                            nextValue = value
-                        )
-                        editorValue = nextValue
-                        viewModel.updateSource(nextValue.text)
-                    },
-                    textStyle = TextStyle(
-                        color = Color(0xFFF1F4F8),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp
-                    ),
-                    visualTransformation = DslSyntaxHighlightTransformation(),
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(editorScroll)
-                )
+                        .weight(1f)
+                        .height(scrollContentMinHeight)
+                        .background(editorBackground)
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    if (editorValue.text.isBlank()) {
+                        Text(
+                            text = "记录 \"开始执行\"\n点击 540 1600",
+                            style = TextStyle(
+                                color = Color(0xFF5A6E83),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 14.sp,
+                                lineHeight = 22.sp
+                            )
+                        )
+                    }
+
+                    BasicTextField(
+                        value = editorValue,
+                        onValueChange = { value ->
+                            val nextValue = applyEditorInputBehaviors(
+                                previousValue = editorValue,
+                                nextValue = value
+                            )
+                            editorValue = nextValue
+                            viewModel.updateSource(nextValue.text)
+                        },
+                        textStyle = TextStyle(
+                            color = Color(0xFFF1F4F8),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp
+                        ),
+                        visualTransformation = DslSyntaxHighlightTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = scrollContentMinHeight)
+                    )
+                }
             }
         }
 
@@ -919,6 +949,11 @@ private fun FileNameDialog(
 private fun buildLineNumbers(source: String): String {
     val lineCount = source.lines().size.coerceAtLeast(1)
     return (1..lineCount).joinToString(separator = "\n")
+}
+
+private fun cursorLineIndex(text: String, cursor: Int): Int {
+    val safeCursor = cursor.coerceIn(0, text.length)
+    return text.take(safeCursor).count { it == '\n' }
 }
 
 private fun insertSnippetAtSelection(
@@ -1482,3 +1517,4 @@ private data class InsertOperationPayload(
 private const val INSERT_CURSOR_MARKER = "__TOUCHSCRIPT_CURSOR_MARKER__"
 private const val INSERT_INDENTED_EMPTY_LINE_MARKER = "__TOUCHSCRIPT_INDENTED_EMPTY_LINE__"
 private const val INDENT_UNIT = "    "
+private const val EDITOR_LINE_HEIGHT_SP = 22
