@@ -2,8 +2,6 @@ package com.lulucloud.touchscript.navigation
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -130,7 +128,13 @@ fun TouchWorkshopApp(
                 EditorScreen(viewModel = viewModel)
             }
             composable(AppDestination.Settings.route) {
-                SettingsScreen(context = context)
+                SettingsScreen(
+                    context = context,
+                    workspaceUri = appSettings.scriptWorkspaceUri,
+                    onChooseWorkspace = {
+                        workspaceLauncher.launch(buildInitialWorkspaceTreeIntent())
+                    }
+                )
             }
         }
     }
@@ -139,7 +143,7 @@ fun TouchWorkshopApp(
         AlertDialog(
             onDismissRequest = { workspaceDialogDismissed = true },
             title = { Text("初始化脚本目录") },
-            text = { Text("首次使用需要授权 Documents 目录。授权后会自动创建 Documents/TouchScript。") },
+            text = { Text("首次使用需要选择一个脚本工作目录。你选择哪个文件夹，触灵工坊就直接在该文件夹下保存脚本和识图素材。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -169,15 +173,5 @@ private sealed class AppDestination(
 }
 
 private fun buildInitialWorkspaceTreeIntent(): Intent {
-    return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-        putExtra(
-            DocumentsContract.EXTRA_INITIAL_URI,
-            DocumentsContract.buildTreeDocumentUri(
-                EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
-                "primary:Documents"
-            )
-        )
-    }
+    return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
 }
-
-private const val EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY = "com.android.externalstorage.documents"

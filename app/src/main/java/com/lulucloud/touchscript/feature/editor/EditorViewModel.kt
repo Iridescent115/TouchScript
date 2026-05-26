@@ -152,7 +152,7 @@ class EditorViewModel(
         viewModelScope.launch {
             val workspaceUri = _uiState.value.scriptWorkspaceUri
             if (workspaceUri.isNullOrBlank()) {
-                onResult(Result.failure(IllegalStateException("请先在“文件”菜单中设置脚本目录")))
+                onResult(Result.failure(IllegalStateException("请先在设置页选择工作目录")))
                 return@launch
             }
 
@@ -167,7 +167,7 @@ class EditorViewModel(
         viewModelScope.launch {
             val workspaceUri = _uiState.value.scriptWorkspaceUri
             if (workspaceUri.isNullOrBlank()) {
-                onResult(Result.failure(IllegalStateException("请先在“文件”菜单中设置脚本目录")))
+                onResult(Result.failure(IllegalStateException("请先在设置页选择工作目录")))
                 return@launch
             }
 

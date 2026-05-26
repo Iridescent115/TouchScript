@@ -1,6 +1,8 @@
 package com.lulucloud.touchscript.feature.settings
 
 import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,9 +20,18 @@ import com.lulucloud.touchscript.ui.components.WorkshopPanel
 import com.lulucloud.touchscript.ui.components.WorkshopScreen
 
 @Composable
-fun SettingsScreen(context: Context) {
+fun SettingsScreen(
+    context: Context,
+    workspaceUri: String?,
+    onChooseWorkspace: () -> Unit
+) {
     WorkshopScreen(modifier = Modifier.statusBarsPadding()) {
         Text("设置", style = MaterialTheme.typography.headlineSmall)
+
+        WorkspacePanel(
+            workspaceUri = workspaceUri,
+            onChooseWorkspace = onChooseWorkspace
+        )
 
         PermissionPanel(
             title = "无障碍服务",
@@ -43,6 +54,28 @@ fun SettingsScreen(context: Context) {
 }
 
 @Composable
+private fun WorkspacePanel(
+    workspaceUri: String?,
+    onChooseWorkspace: () -> Unit
+) {
+    WorkshopPanel(title = "工作目录") {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onChooseWorkspace,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("选择工作目录")
+            }
+            Text(
+                text = "当前工作目录：${formatWorkspaceUri(workspaceUri)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 private fun PermissionPanel(
     title: String,
     actionText: String,
@@ -58,4 +91,17 @@ private fun PermissionPanel(
             }
         }
     }
+}
+
+private fun formatWorkspaceUri(workspaceUri: String?): String {
+    if (workspaceUri.isNullOrBlank()) {
+        return "未选择"
+    }
+
+    return runCatching {
+        val uri = Uri.parse(workspaceUri)
+        DocumentsContract.getDocumentId(uri)
+            .replace("primary:", "内部存储/")
+            .ifBlank { workspaceUri }
+    }.getOrDefault(workspaceUri)
 }

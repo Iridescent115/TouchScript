@@ -111,16 +111,7 @@ class FileScriptRepository(
     suspend fun ensureScriptWorkspace(parentTreeUri: String): String = withContext(Dispatchers.IO) {
         val treeUri = Uri.parse(parentTreeUri)
         val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
-        val rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId)
-        val rootName = queryDisplayName(rootDocumentUri)
-
-        val scriptWorkspaceUri = if (rootName == SCRIPT_WORKSPACE_DIR_NAME) {
-            rootDocumentUri
-        } else {
-            ensureDirectory(rootDocumentUri, SCRIPT_WORKSPACE_DIR_NAME)
-        }
-
-        scriptWorkspaceUri.toString()
+        DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId).toString()
     }
 
     suspend fun importRecognitionImage(
@@ -335,7 +326,6 @@ class FileScriptRepository(
     private fun isContentUri(path: String): Boolean = path.startsWith("content://")
 
     private companion object {
-        const val SCRIPT_WORKSPACE_DIR_NAME = "TouchScript"
         const val RECOGNITION_IMAGES_DIR_NAME = "Images"
     }
 }

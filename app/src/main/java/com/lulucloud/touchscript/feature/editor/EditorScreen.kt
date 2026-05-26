@@ -271,14 +271,6 @@ fun EditorScreen(viewModel: EditorViewModel) {
                                 showSaveAsDialog = true
                             }
                         )
-                        DropdownMenuItem(
-                            text = { Text("设置脚本目录") },
-                            onClick = {
-                                showFileMenu = false
-                                pendingSaveName = null
-                                pickWorkspaceLauncher.launch(buildOpenScriptTreeIntent())
-                            }
-                        )
                     }
                     EditorDropdownMenu(
                         text = "插入操作",
@@ -1199,12 +1191,7 @@ private fun buildCreateScriptIntent(fileName: String, initialUri: String?): Inte
 }
 
 private fun buildOpenScriptTreeIntent(): Intent {
-    return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-        putExtra(
-            DocumentsContract.EXTRA_INITIAL_URI,
-            buildDefaultDocumentsTreeUri()
-        )
-    }
+    return Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
 }
 
 private fun buildPickImageFromGalleryIntent(): Intent {
@@ -1242,13 +1229,6 @@ private fun buildDefaultTouchScriptDocumentUri(): Uri {
     return DocumentsContract.buildDocumentUri(
         EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
         "primary:Documents/TouchScript"
-    )
-}
-
-private fun buildDefaultDocumentsTreeUri(): Uri {
-    return DocumentsContract.buildTreeDocumentUri(
-        EXTERNAL_STORAGE_DOCUMENTS_AUTHORITY,
-        "primary:Documents"
     )
 }
 
