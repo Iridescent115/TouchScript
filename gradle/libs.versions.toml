@@ -17,7 +17,7 @@ timber = "5.0.1"
 luaj = "3.0.1"
 opencv = "4.13.0"
 mlkitTextRecognitionChinese = "16.0.1"
-ksp = "2.2.10-2.0.2"
+ksp = "2.3.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

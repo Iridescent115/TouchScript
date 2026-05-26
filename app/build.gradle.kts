@@ -44,6 +44,15 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            keepDebugSymbols += listOf(
+                "**/libandroidx.graphics.path.so",
+                "**/libc++_shared.so",
+                "**/libdatastore_shared_counter.so",
+                "**/libmlkit_google_ocr_pipeline.so",
+                "**/libopencv_java4.so"
+            )
+        }
     }
 }
 
