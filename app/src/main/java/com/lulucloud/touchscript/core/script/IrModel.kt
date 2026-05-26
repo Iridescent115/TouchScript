@@ -115,4 +115,18 @@ data class IrImageFindExpression(
     val confidence: IrExpression
 ) : IrExpression
 
-data object IrTextRecognitionExpression : IrExpression
+data class IrTextRegion(
+    val left: IrExpression,
+    val top: IrExpression,
+    val right: IrExpression,
+    val bottom: IrExpression
+)
+
+data class IrTextFindExpression(
+    val targetText: IrExpression,
+    val region: IrTextRegion?
+) : IrExpression
+
+data class IrRegionTextRecognitionExpression(
+    val region: IrTextRegion
+) : IrExpression

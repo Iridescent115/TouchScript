@@ -56,20 +56,37 @@ class ScriptCompilerTest {
     }
 
     @Test
-    fun `compile should support text recognition result assignment and member access`() {
+    fun `compile should support find text result assignment and member access`() {
         val compiler = ScriptCompiler()
 
         val result = compiler.compile(
             """
-                设 文字1 = 识文字
+                设 文字结果1 = 查找文字 "设置" 0 0 1080 600
+                如果 文字结果1.找到
+                点击 文字结果1.x 文字结果1.y
+                结束如果
+            """.trimIndent()
+        )
+
+        assertTrue(result.luaSource.contains("""vars["文字结果1"] = ocr.findText("设置", 0, 0, 1080, 600)"""))
+        assertTrue(result.luaSource.contains("""if __member(vars["文字结果1"], "found") then"""))
+        assertTrue(result.luaSource.contains("""touch.click(__member(vars["文字结果1"], "x"), __member(vars["文字结果1"], "y"))"""))
+    }
+
+    @Test
+    fun `compile should support region text recognition result assignment and member access`() {
+        val compiler = ScriptCompiler()
+
+        val result = compiler.compile(
+            """
+                设 文字1 = 识别文字 0 0 1080 600
                 如果 文字1.找到
                 记录 文字1.文本
                 结束如果
             """.trimIndent()
         )
 
-        assertTrue(result.luaSource.contains("""vars["文字1"] = ocr.recognize()"""))
-        assertTrue(result.luaSource.contains("""if __member(vars["文字1"], "found") then"""))
+        assertTrue(result.luaSource.contains("""vars["文字1"] = ocr.recognizeRegion(0, 0, 1080, 600)"""))
         assertTrue(result.luaSource.contains("""log.info(__member(vars["文字1"], "text"))"""))
     }
 

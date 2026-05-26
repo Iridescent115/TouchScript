@@ -119,19 +119,62 @@ class LuaHostBridge(
     }
 
     private fun ocrTable(): LuaTable = LuaTable().apply {
-        set("recognize", zeroArgFunction {
+        set("findText", function { args ->
             val recognizer = textRecognizerEngine ?: throw IllegalStateException("识文字服务未初始化")
+            val targetText = args.checkjstring(1)
+            val region = if (args.narg() >= 5) {
+                TextRecognitionRegion(
+                    left = args.checkdouble(2).roundToInt(),
+                    top = args.checkdouble(3).roundToInt(),
+                    right = args.checkdouble(4).roundToInt(),
+                    bottom = args.checkdouble(5).roundToInt()
+                )
+            } else {
+                null
+            }
             val result = runBlocking {
                 sessionManager.ensureNotStopped()
                 sessionManager.awaitIfPaused()
                 sessionManager.ensureNotStopped()
-                sessionManager.appendLog("INFO", "开始识文字")
-                recognizer.recognizeScreenText()
+                sessionManager.appendLog("INFO", "开始查找文字：$targetText")
+                recognizer.findTextOnScreen(targetText, region)
             }
             runBlocking {
                 sessionManager.appendLog(
                     if (result.found) "INFO" else "ERROR",
-                    "识文字${if (result.found) "成功" else "未发现文字"}：${result.lineCount} 行"
+                    "查找文字${if (result.found) "成功" else "失败"}：${result.text.ifBlank { targetText }}"
+                )
+            }
+            LuaTable().apply {
+                set("found", LuaValue.valueOf(result.found))
+                set("text", LuaValue.valueOf(result.text))
+                set("x", LuaValue.valueOf(result.x))
+                set("y", LuaValue.valueOf(result.y))
+                set("left", LuaValue.valueOf(result.left))
+                set("top", LuaValue.valueOf(result.top))
+                set("right", LuaValue.valueOf(result.right))
+                set("bottom", LuaValue.valueOf(result.bottom))
+            }
+        })
+        set("recognizeRegion", function { args ->
+            val recognizer = textRecognizerEngine ?: throw IllegalStateException("识文字服务未初始化")
+            val region = TextRecognitionRegion(
+                left = args.checkdouble(1).roundToInt(),
+                top = args.checkdouble(2).roundToInt(),
+                right = args.checkdouble(3).roundToInt(),
+                bottom = args.checkdouble(4).roundToInt()
+            )
+            val result = runBlocking {
+                sessionManager.ensureNotStopped()
+                sessionManager.awaitIfPaused()
+                sessionManager.ensureNotStopped()
+                sessionManager.appendLog("INFO", "开始识别区域文字")
+                recognizer.recognizeRegion(region)
+            }
+            runBlocking {
+                sessionManager.appendLog(
+                    if (result.found) "INFO" else "ERROR",
+                    "区域识别文字${if (result.found) "成功" else "未发现文字"}：${result.lineCount} 行"
                 )
             }
             LuaTable().apply {

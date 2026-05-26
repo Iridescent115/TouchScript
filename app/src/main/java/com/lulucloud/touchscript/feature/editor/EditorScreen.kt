@@ -41,6 +41,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -659,6 +660,7 @@ private fun InsertOperationDialog(
     var fieldC by remember(operation) { mutableStateOf(operation.defaultFieldC) }
     var fieldD by remember(operation) { mutableStateOf(operation.defaultFieldD) }
     var fieldE by remember(operation) { mutableStateOf(operation.defaultFieldE) }
+    var findTextUseRegion by remember(operation) { mutableStateOf(false) }
     var activeCaptureRequestId by remember(operation) { mutableStateOf<Long?>(null) }
     var pendingPreprocessUri by remember(operation) { mutableStateOf<Uri?>(null) }
     var pendingPreprocessName by remember(operation) { mutableStateOf("") }
@@ -705,6 +707,23 @@ private fun InsertOperationDialog(
                     fieldB = start.y.toString()
                     fieldC = end.x.toString()
                     fieldD = end.y.toString()
+                }
+
+                InsertOperationType.FIND_TEXT -> {
+                    val rect = result.rect ?: return@collect
+                    findTextUseRegion = true
+                    fieldB = rect.left.toString()
+                    fieldC = rect.top.toString()
+                    fieldD = rect.right.toString()
+                    fieldE = rect.bottom.toString()
+                }
+
+                InsertOperationType.RECOGNIZE_REGION_TEXT -> {
+                    val rect = result.rect ?: return@collect
+                    fieldA = rect.left.toString()
+                    fieldB = rect.top.toString()
+                    fieldC = rect.right.toString()
+                    fieldD = rect.bottom.toString()
                 }
 
                 else -> Unit
@@ -771,37 +790,72 @@ private fun InsertOperationDialog(
                             )
                         }
                     }
-                    operation.fieldLabelB?.let {
-                        OutlinedTextField(
-                            value = fieldB,
-                            onValueChange = { value -> fieldB = value },
-                            label = { Text(it) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    if (operation == InsertOperationType.FIND_TEXT) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = "查找范围",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { findTextUseRegion = false },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = !findTextUseRegion,
+                                    onClick = { findTextUseRegion = false }
+                                )
+                                Text("全屏查找")
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { findTextUseRegion = true },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = findTextUseRegion,
+                                    onClick = { findTextUseRegion = true }
+                                )
+                                Text("区域查找")
+                            }
+                        }
                     }
-                    operation.fieldLabelC?.let {
-                        OutlinedTextField(
-                            value = fieldC,
-                            onValueChange = { value -> fieldC = value },
-                            label = { Text(it) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    operation.fieldLabelD?.let {
-                        OutlinedTextField(
-                            value = fieldD,
-                            onValueChange = { value -> fieldD = value },
-                            label = { Text(it) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    operation.fieldLabelE?.let {
-                        OutlinedTextField(
-                            value = fieldE,
-                            onValueChange = { value -> fieldE = value },
-                            label = { Text(it) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    if (operation != InsertOperationType.FIND_TEXT || findTextUseRegion) {
+                        operation.fieldLabelB?.let {
+                            OutlinedTextField(
+                                value = fieldB,
+                                onValueChange = { value -> fieldB = value },
+                                label = { Text(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        operation.fieldLabelC?.let {
+                            OutlinedTextField(
+                                value = fieldC,
+                                onValueChange = { value -> fieldC = value },
+                                label = { Text(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        operation.fieldLabelD?.let {
+                            OutlinedTextField(
+                                value = fieldD,
+                                onValueChange = { value -> fieldD = value },
+                                label = { Text(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        operation.fieldLabelE?.let {
+                            OutlinedTextField(
+                                value = fieldE,
+                                onValueChange = { value -> fieldE = value },
+                                label = { Text(it) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
 
@@ -817,7 +871,7 @@ private fun InsertOperationDialog(
                         ) {
                             Text("图片预处理")
                         }
-                    } else if (operation.supportsCoordinateCapture) {
+                    } else if (operation.supportsCoordinateCapture || operation.supportsRegionCapture && (operation != InsertOperationType.FIND_TEXT || findTextUseRegion)) {
                         TextButton(
                             onClick = {
                                 val request = operation.createCaptureRequest() ?: return@TextButton
@@ -825,7 +879,7 @@ private fun InsertOperationDialog(
                                 CoordinateCaptureService.launch(context, request)
                             }
                         ) {
-                            Text("抓抓")
+                            Text(if (operation.supportsRegionCapture) "抓区域" else "抓抓")
                         }
                     } else {
                         Spacer(modifier = Modifier.width(1.dp))
@@ -836,13 +890,14 @@ private fun InsertOperationDialog(
                     }
                     TextButton(
                         onClick = {
+                            val useRegionFields = operation != InsertOperationType.FIND_TEXT || findTextUseRegion
                             onInsert(
                                 operation.buildInsertion(
                                     fieldA = fieldA,
-                                    fieldB = fieldB,
-                                    fieldC = fieldC,
-                                    fieldD = fieldD,
-                                    fieldE = fieldE
+                                    fieldB = if (useRegionFields) fieldB else "",
+                                    fieldC = if (useRegionFields) fieldC else "",
+                                    fieldD = if (useRegionFields) fieldD else "",
+                                    fieldE = if (useRegionFields) fieldE else ""
                                 )
                             )
                         }
@@ -1294,7 +1349,8 @@ private enum class InsertOperationGroup(
         label = "识别",
         operations = listOf(
             InsertOperationType.IMAGE_FIND,
-            InsertOperationType.TEXT_RECOGNITION
+            InsertOperationType.FIND_TEXT,
+            InsertOperationType.RECOGNIZE_REGION_TEXT
         )
     ),
     LOGIC(
@@ -1396,9 +1452,27 @@ private enum class InsertOperationType(
         fieldLabelB = "置信度(0-1)",
         defaultFieldB = "0.85"
     ),
-    TEXT_RECOGNITION(
-        label = "识文字",
-        dialogTitle = "插入识文字"
+    FIND_TEXT(
+        label = "查找文字",
+        dialogTitle = "插入查找文字",
+        fieldLabelA = "目标文字",
+        fieldLabelB = "左(可空)",
+        fieldLabelC = "上(可空)",
+        fieldLabelD = "右(可空)",
+        fieldLabelE = "下(可空)",
+        defaultFieldA = "设置"
+    ),
+    RECOGNIZE_REGION_TEXT(
+        label = "识别区域文字",
+        dialogTitle = "插入识别区域文字",
+        fieldLabelA = "左",
+        fieldLabelB = "上",
+        fieldLabelC = "右",
+        fieldLabelD = "下",
+        defaultFieldA = "0",
+        defaultFieldB = "0",
+        defaultFieldC = "1080",
+        defaultFieldD = "600"
     ),
     ASSIGN(
         label = "设变量",
@@ -1440,6 +1514,9 @@ private enum class InsertOperationType(
     val supportsCoordinateCapture: Boolean
         get() = this == CLICK || this == LONG_PRESS || this == SWIPE
 
+    val supportsRegionCapture: Boolean
+        get() = this == FIND_TEXT || this == RECOGNIZE_REGION_TEXT
+
     val supportsImagePicker: Boolean
         get() = this == IMAGE_FIND
 
@@ -1471,9 +1548,28 @@ private enum class InsertOperationType(
                     """.trimIndent()
                 )
             }
-            TEXT_RECOGNITION -> InsertOperationPayload(
+            FIND_TEXT -> {
+                val target = sanitizeQuotedText(fieldA.ifBlank { "设置" })
+                val hasRegion = listOf(fieldB, fieldC, fieldD, fieldE).all { it.isNotBlank() }
+                val regionArgs = if (hasRegion) {
+                    " ${fieldB} ${fieldC} ${fieldD} ${fieldE}"
+                } else {
+                    ""
+                }
+                InsertOperationPayload(
+                    """
+                    设 文字结果1 = 查找文字 "$target"$regionArgs
+                    如果 文字结果1.找到
+                        点击 文字结果1.x 文字结果1.y
+                    否则
+                        记录 "未找到文字：$target"
+                    结束如果
+                    """.trimIndent()
+                )
+            }
+            RECOGNIZE_REGION_TEXT -> InsertOperationPayload(
                 """
-                设 文字1 = 识文字
+                设 文字1 = 识别文字 ${fieldA.ifBlank { "0" }} ${fieldB.ifBlank { "0" }} ${fieldC.ifBlank { "1080" }} ${fieldD.ifBlank { "600" }}
                 如果 文字1.找到
                     记录 文字1.文本
                 否则
@@ -1515,6 +1611,10 @@ private enum class InsertOperationType(
             pointCount = 2,
             stepLabels = listOf("起点", "终点")
         )
+
+        FIND_TEXT -> CoordinateCaptureManager.createRectangleRequest("文字查找区域")
+
+        RECOGNIZE_REGION_TEXT -> CoordinateCaptureManager.createRectangleRequest("文字识别区域")
 
         else -> null
     }

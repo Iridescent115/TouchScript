@@ -42,6 +42,7 @@ internal class ExpressionParser(
         if (trimmed.isBlank()) {
             throw ScriptParseException("表达式不能为空", lineNumber)
         }
+        parseTextRecognitionExpression(trimmed)?.let { return it }
         tokens = tokenize(trimmed)
         currentIndex = 0
         val parsed = parseOr()
@@ -246,8 +247,6 @@ internal class ExpressionParser(
                         imageName = parseUnary(),
                         confidence = parseOr()
                     )
-                } else if (identifier.text == KEYWORD_TEXT_RECOGNITION) {
-                    TextRecognitionExpressionNode
                 } else {
                     VariableReferenceNode(identifier.text)
                 }
@@ -309,8 +308,91 @@ internal class ExpressionParser(
 
     private fun isIdentifierPart(char: Char): Boolean = isIdentifierStart(char) || char.isDigit()
 
+    private fun parseTextRecognitionExpression(expression: String): ExpressionNode? {
+        return when {
+            expression == KEYWORD_TEXT_RECOGNITION_LEGACY -> {
+                throw ScriptParseException("“识文字”已移除，请改用：查找文字 \"目标\" 或 识别文字 左 上 右 下", lineNumber)
+            }
+
+            expression.startsWith("$KEYWORD_FIND_TEXT ") -> {
+                val args = tokenizeSpecialArguments(expression.removePrefix(KEYWORD_FIND_TEXT).trim())
+                if (args.size != 1 && args.size != 5) {
+                    throw ScriptParseException("查找文字格式应为：查找文字 \"目标\" 或 查找文字 \"目标\" 左 上 右 下", lineNumber)
+                }
+                TextFindExpressionNode(
+                    targetText = ExpressionParser(lineNumber).parse(args[0]),
+                    region = args.takeIf { it.size == 5 }?.let {
+                        TextRegionNode(
+                            left = ExpressionParser(lineNumber).parse(it[1]),
+                            top = ExpressionParser(lineNumber).parse(it[2]),
+                            right = ExpressionParser(lineNumber).parse(it[3]),
+                            bottom = ExpressionParser(lineNumber).parse(it[4])
+                        )
+                    }
+                )
+            }
+
+            expression.startsWith("$KEYWORD_RECOGNIZE_TEXT ") -> {
+                val args = tokenizeSpecialArguments(expression.removePrefix(KEYWORD_RECOGNIZE_TEXT).trim())
+                if (args.size != 4) {
+                    throw ScriptParseException("识别文字格式应为：识别文字 左 上 右 下", lineNumber)
+                }
+                RegionTextRecognitionExpressionNode(
+                    region = TextRegionNode(
+                        left = ExpressionParser(lineNumber).parse(args[0]),
+                        top = ExpressionParser(lineNumber).parse(args[1]),
+                        right = ExpressionParser(lineNumber).parse(args[2]),
+                        bottom = ExpressionParser(lineNumber).parse(args[3])
+                    )
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    private fun tokenizeSpecialArguments(source: String): List<String> {
+        if (source.isBlank()) {
+            return emptyList()
+        }
+
+        val args = mutableListOf<String>()
+        val builder = StringBuilder()
+        var inString = false
+
+        source.forEachIndexed { index, char ->
+            when {
+                char == '"' -> {
+                    builder.append(char)
+                    inString = !inString
+                }
+
+                char.isWhitespace() && !inString -> {
+                    if (builder.isNotBlank()) {
+                        args += builder.toString()
+                        builder.clear()
+                    }
+                }
+
+                else -> builder.append(char)
+            }
+
+            if (index == source.lastIndex && builder.isNotBlank()) {
+                args += builder.toString()
+            }
+        }
+
+        if (inString) {
+            throw ScriptParseException("字符串引号没有闭合", lineNumber)
+        }
+
+        return args
+    }
+
     private companion object {
         const val KEYWORD_IMAGE_FIND = "识图"
-        const val KEYWORD_TEXT_RECOGNITION = "识文字"
+        const val KEYWORD_FIND_TEXT = "查找文字"
+        const val KEYWORD_RECOGNIZE_TEXT = "识别文字"
+        const val KEYWORD_TEXT_RECOGNITION_LEGACY = "识文字"
     }
 }

@@ -87,8 +87,24 @@ class ScriptLowerer {
                 confidence = lowerExpression(expressionNode.confidence)
             )
 
-            TextRecognitionExpressionNode -> IrTextRecognitionExpression
+            is TextFindExpressionNode -> IrTextFindExpression(
+                targetText = lowerExpression(expressionNode.targetText),
+                region = expressionNode.region?.let(::lowerTextRegion)
+            )
+
+            is RegionTextRecognitionExpressionNode -> IrRegionTextRecognitionExpression(
+                region = lowerTextRegion(expressionNode.region)
+            )
         }
+    }
+
+    private fun lowerTextRegion(region: TextRegionNode): IrTextRegion {
+        return IrTextRegion(
+            left = lowerExpression(region.left),
+            top = lowerExpression(region.top),
+            right = lowerExpression(region.right),
+            bottom = lowerExpression(region.bottom)
+        )
     }
 }
 
@@ -210,8 +226,22 @@ class LuaGenerator {
                 "image.find(${renderExpression(expression.imageName)}, ${renderExpression(expression.confidence)})"
             }
 
-            IrTextRecognitionExpression -> "ocr.recognize()"
+            is IrTextFindExpression -> {
+                val target = renderExpression(expression.targetText)
+                expression.region?.let { region ->
+                    "ocr.findText($target, ${renderTextRegion(region)})"
+                } ?: "ocr.findText($target)"
+            }
+
+            is IrRegionTextRecognitionExpression -> {
+                "ocr.recognizeRegion(${renderTextRegion(expression.region)})"
+            }
         }
+    }
+
+    private fun renderTextRegion(region: IrTextRegion): String {
+        return listOf(region.left, region.top, region.right, region.bottom)
+            .joinToString(separator = ", ") { renderExpression(it) }
     }
 
     private fun mapMemberName(propertyName: String): String {
@@ -219,6 +249,10 @@ class LuaGenerator {
             "找到", "found" -> "found"
             "文本", "text" -> "text"
             "行数", "lineCount" -> "lineCount"
+            "左", "left" -> "left"
+            "上", "top" -> "top"
+            "右", "right" -> "right"
+            "下", "bottom" -> "bottom"
             "置信度", "分数", "score" -> "score"
             "x", "X" -> "x"
             "y", "Y" -> "y"

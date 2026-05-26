@@ -26,7 +26,7 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             }
         }
 
-        "\"[^\"]*\"".toRegex().findAll(content).forEach { match ->
+        STRING_LITERAL_REGEX.findAll(content).forEach { match ->
             builder.addStyle(
                 SpanStyle(color = Color(0xFF6ED3CF)),
                 start = match.range.first,
@@ -42,10 +42,25 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             )
         }
 
+        val stringRanges = STRING_LITERAL_REGEX.findAll(content).map { it.range }.toList()
+        IDENTIFIER_REGEX.findAll(content).forEach { match ->
+            val identifier = match.value
+            if (identifier in RESERVED_WORDS || stringRanges.any { match.range.first in it }) {
+                return@forEach
+            }
+            builder.addStyle(
+                SpanStyle(color = Color(0xFFB7A7FF)),
+                start = match.range.first,
+                end = match.range.last + 1
+            )
+        }
+
         return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }
 
     private companion object {
+        val STRING_LITERAL_REGEX = "\"[^\"]*\"".toRegex()
+        val IDENTIFIER_REGEX = "[_\\p{L}\\u0080-\\uFFFF][\\p{L}\\p{N}\\u0080-\\uFFFF_]*".toRegex()
         val KEYWORDS = listOf(
             "点击",
             "长按",
@@ -55,6 +70,8 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             "启动应用",
             "记录",
             "识图",
+            "查找文字",
+            "识别文字",
             "设",
             "无限循环",
             "循环",
@@ -66,5 +83,6 @@ class DslSyntaxHighlightTransformation : VisualTransformation {
             "主页",
             "停止运行"
         )
+        val RESERVED_WORDS = KEYWORDS + listOf("真", "假", "次")
     }
 }

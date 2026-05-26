@@ -115,7 +115,21 @@ data class ImageFindExpressionNode(
     val confidence: ExpressionNode
 ) : ExpressionNode
 
-data object TextRecognitionExpressionNode : ExpressionNode
+data class TextRegionNode(
+    val left: ExpressionNode,
+    val top: ExpressionNode,
+    val right: ExpressionNode,
+    val bottom: ExpressionNode
+)
+
+data class TextFindExpressionNode(
+    val targetText: ExpressionNode,
+    val region: TextRegionNode?
+) : ExpressionNode
+
+data class RegionTextRecognitionExpressionNode(
+    val region: TextRegionNode
+) : ExpressionNode
 
 enum class UnaryOperator {
     NOT,

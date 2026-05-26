@@ -68,12 +68,35 @@ class ScriptParserTest {
     }
 
     @Test
-    fun `parseDsl should support text recognition expression result`() {
+    fun `parseDsl should support find text expression result`() {
         val parser = ScriptParser()
 
         val result = parser.parseDsl(
             """
-                设 文字1 = 识文字
+                设 文字结果1 = 查找文字 "设置" 0 0 1080 600
+                如果 文字结果1.找到
+                点击 文字结果1.x 文字结果1.y
+                结束如果
+            """.trimIndent()
+        )
+
+        val assignNode = result.statements[0] as AssignActionNode
+        assertTrue(assignNode.expression is TextFindExpressionNode)
+
+        val ifNode = result.statements[1] as IfControlNode
+        assertTrue(ifNode.condition is MemberAccessExpressionNode)
+        val clickNode = ifNode.thenBranch[0] as ClickActionNode
+        assertTrue(clickNode.x is MemberAccessExpressionNode)
+        assertTrue(clickNode.y is MemberAccessExpressionNode)
+    }
+
+    @Test
+    fun `parseDsl should support region text recognition expression result`() {
+        val parser = ScriptParser()
+
+        val result = parser.parseDsl(
+            """
+                设 文字1 = 识别文字 0 0 1080 600
                 如果 文字1.找到
                 记录 文字1.文本
                 结束如果
@@ -81,11 +104,7 @@ class ScriptParserTest {
         )
 
         val assignNode = result.statements[0] as AssignActionNode
-        assertTrue(assignNode.expression is TextRecognitionExpressionNode)
-
-        val ifNode = result.statements[1] as IfControlNode
-        assertTrue(ifNode.condition is MemberAccessExpressionNode)
-        assertTrue((ifNode.thenBranch[0] as LogActionNode).message is MemberAccessExpressionNode)
+        assertTrue(assignNode.expression is RegionTextRecognitionExpressionNode)
     }
 
     @Test

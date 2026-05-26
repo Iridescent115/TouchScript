@@ -2,8 +2,12 @@ package com.lulucloud.touchscript.core.automation
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
@@ -14,11 +18,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.setPadding
 import com.lulucloud.touchscript.R
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 class CoordinateCaptureOverlayController(
     private val context: Context,
-    private val onPointCaptured: (ScreenPoint) -> Unit
+    private val onPointCaptured: (ScreenPoint) -> Unit,
+    private val onRectCaptured: (ScreenRect) -> Unit
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
@@ -30,6 +37,7 @@ class CoordinateCaptureOverlayController(
     private var crosshairHorizontalView: View? = null
     private var crosshairVerticalView: View? = null
     private var crosshairRingView: View? = null
+    private var selectionRectView: SelectionRectView? = null
     private var captureLocked = false
 
     fun show() {
@@ -205,6 +213,130 @@ class CoordinateCaptureOverlayController(
         crosshairHorizontalView = horizontalCrosshair
         crosshairVerticalView = verticalCrosshair
         crosshairRingView = ringCrosshair
+        selectionRectView = null
+        captureLocked = false
+    }
+
+    fun showRectangleCaptureLayer(stepLabel: String) {
+        if (scrimView != null) {
+            hintView?.text = "请拖动选框选择$stepLabel"
+            selectionRectView?.reset()
+            captureLocked = false
+            return
+        }
+
+        var rawStartPoint: ScreenPoint? = null
+        var displayStartPoint: ScreenPoint? = null
+
+        val scrim = FrameLayout(context).apply {
+            setBackgroundColor(0x88343B45.toInt())
+            isClickable = true
+        }
+
+        val selectionRect = SelectionRectView(context)
+
+        scrim.setOnTouchListener { _, event ->
+            if (captureLocked) {
+                return@setOnTouchListener true
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    rawStartPoint = ScreenPoint(
+                        x = event.rawX.roundToInt(),
+                        y = event.rawY.roundToInt()
+                    )
+                    displayStartPoint = ScreenPoint(
+                        x = event.x.roundToInt(),
+                        y = event.y.roundToInt()
+                    )
+                    selectionRect.reset()
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val start = displayStartPoint ?: return@setOnTouchListener true
+                    val current = ScreenPoint(
+                        x = event.x.roundToInt(),
+                        y = event.y.roundToInt()
+                    )
+                    selectionRect.update(start, current)
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    val rawStart = rawStartPoint ?: return@setOnTouchListener true
+                    val displayStart = displayStartPoint ?: return@setOnTouchListener true
+                    val rawEnd = ScreenPoint(
+                        x = event.rawX.roundToInt(),
+                        y = event.rawY.roundToInt()
+                    )
+                    val displayEnd = ScreenPoint(
+                        x = event.x.roundToInt(),
+                        y = event.y.roundToInt()
+                    )
+                    selectionRect.update(displayStart, displayEnd)
+                    val rect = normalizeRect(rawStart, rawEnd)
+                    hintView?.text = "已选择区域：${rect.left}, ${rect.top}, ${rect.right}, ${rect.bottom}"
+                    captureLocked = true
+                    onRectCaptured(rect)
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    rawStartPoint = null
+                    displayStartPoint = null
+                    selectionRect.reset()
+                    true
+                }
+
+                else -> true
+            }
+        }
+
+        val hint = TextView(context).apply {
+            text = "请拖动选框选择$stepLabel"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 16f
+            setPadding(28)
+            setBackgroundResource(R.drawable.bg_overlay_panel)
+        }
+
+        scrim.addView(
+            selectionRect,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        scrim.addView(
+            hint,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            ).apply {
+                topMargin = 260
+            }
+        )
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+
+        windowManager.addView(scrim, params)
+        scrimView = scrim
+        hintView = hint
+        pointView = null
+        crosshairHorizontalView = null
+        crosshairVerticalView = null
+        crosshairRingView = null
+        selectionRectView = selectionRect
         captureLocked = false
     }
 
@@ -216,6 +348,7 @@ class CoordinateCaptureOverlayController(
         crosshairHorizontalView = null
         crosshairVerticalView = null
         crosshairRingView = null
+        selectionRectView = null
         captureLocked = false
     }
 
@@ -299,5 +432,58 @@ class CoordinateCaptureOverlayController(
 
     private fun dp(value: Int): Int {
         return (value * context.resources.displayMetrics.density).roundToInt()
+    }
+
+    private fun normalizeRect(start: ScreenPoint, end: ScreenPoint): ScreenRect {
+        val maxRight = screenWidth().coerceAtLeast(1)
+        val maxBottom = screenHeight().coerceAtLeast(1)
+        val left = min(start.x, end.x).coerceIn(0, maxRight - 1)
+        val top = min(start.y, end.y).coerceIn(0, maxBottom - 1)
+        val right = max(start.x, end.x).coerceIn(left + 1, maxRight)
+        val bottom = max(start.y, end.y).coerceIn(top + 1, maxBottom)
+        return ScreenRect(left = left, top = top, right = right, bottom = bottom)
+    }
+
+    private inner class SelectionRectView(context: Context) : View(context) {
+        private val rect = RectF()
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x33F4D7A1
+            style = Paint.Style.FILL
+        }
+        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(244, 215, 161)
+            style = Paint.Style.STROKE
+            strokeWidth = dp(2).toFloat()
+        }
+
+        init {
+            visibility = View.GONE
+        }
+
+        fun update(start: ScreenPoint, end: ScreenPoint) {
+            rect.set(
+                min(start.x, end.x).toFloat(),
+                min(start.y, end.y).toFloat(),
+                max(start.x, end.x).toFloat(),
+                max(start.y, end.y).toFloat()
+            )
+            visibility = View.VISIBLE
+            invalidate()
+        }
+
+        fun reset() {
+            rect.setEmpty()
+            visibility = View.GONE
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            if (rect.isEmpty) {
+                return
+            }
+            canvas.drawRoundRect(rect, dp(8).toFloat(), dp(8).toFloat(), fillPaint)
+            canvas.drawRoundRect(rect, dp(8).toFloat(), dp(8).toFloat(), strokePaint)
+        }
     }
 }

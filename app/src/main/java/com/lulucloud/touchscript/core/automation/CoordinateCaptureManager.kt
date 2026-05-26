@@ -13,15 +13,29 @@ data class ScreenPoint(
     val y: Int
 )
 
+data class ScreenRect(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int
+)
+
+enum class CoordinateCaptureMode {
+    POINTS,
+    RECTANGLE
+}
+
 data class CoordinateCaptureRequest(
     val requestId: Long,
     val pointCount: Int,
-    val stepLabels: List<String>
+    val stepLabels: List<String>,
+    val mode: CoordinateCaptureMode = CoordinateCaptureMode.POINTS
 )
 
 data class CoordinateCaptureResult(
     val requestId: Long,
-    val points: List<ScreenPoint>
+    val points: List<ScreenPoint> = emptyList(),
+    val rect: ScreenRect? = null
 )
 
 object CoordinateCaptureManager {
@@ -41,6 +55,15 @@ object CoordinateCaptureManager {
         )
     }
 
+    fun createRectangleRequest(stepLabel: String): CoordinateCaptureRequest {
+        return CoordinateCaptureRequest(
+            requestId = nextRequestId.getAndIncrement(),
+            pointCount = 0,
+            stepLabels = listOf(stepLabel),
+            mode = CoordinateCaptureMode.RECTANGLE
+        )
+    }
+
     fun activate(request: CoordinateCaptureRequest) {
         _activeRequest.value = request
     }
@@ -51,6 +74,17 @@ object CoordinateCaptureManager {
             CoordinateCaptureResult(
                 requestId = request.requestId,
                 points = points
+            )
+        )
+        _activeRequest.value = null
+    }
+
+    fun complete(rect: ScreenRect) {
+        val request = _activeRequest.value ?: return
+        _results.tryEmit(
+            CoordinateCaptureResult(
+                requestId = request.requestId,
+                rect = rect
             )
         )
         _activeRequest.value = null

@@ -24,7 +24,7 @@ class CoordinateCaptureService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        overlayController = CoordinateCaptureOverlayController(this, ::handlePointCaptured)
+        overlayController = CoordinateCaptureOverlayController(this, ::handlePointCaptured, ::handleRectCaptured)
         createNotificationChannel()
     }
 
@@ -63,13 +63,22 @@ class CoordinateCaptureService : LifecycleService() {
             return
         }
         activeRequest = request
-        val nextLabel = request.stepLabels.getOrElse(capturedPoints.size) { "目标点" }
-        overlayController.updateStatus("正在抓取$nextLabel")
-        overlayController.showCaptureLayer(nextLabel)
+        if (request.mode == CoordinateCaptureMode.RECTANGLE) {
+            val label = request.stepLabels.firstOrNull() ?: "识别区域"
+            overlayController.updateStatus("正在选择$label")
+            overlayController.showRectangleCaptureLayer(label)
+        } else {
+            val nextLabel = request.stepLabels.getOrElse(capturedPoints.size) { "目标点" }
+            overlayController.updateStatus("正在抓取$nextLabel")
+            overlayController.showCaptureLayer(nextLabel)
+        }
     }
 
     private fun handlePointCaptured(point: ScreenPoint) {
         val request = activeRequest ?: return
+        if (request.mode != CoordinateCaptureMode.POINTS) {
+            return
+        }
         capturedPoints += point
         lifecycleScope.launch {
             delay(220)
@@ -88,6 +97,21 @@ class CoordinateCaptureService : LifecycleService() {
         }
     }
 
+    private fun handleRectCaptured(rect: ScreenRect) {
+        val request = activeRequest ?: return
+        if (request.mode != CoordinateCaptureMode.RECTANGLE) {
+            return
+        }
+        lifecycleScope.launch {
+            delay(260)
+            overlayController.hideCaptureLayer()
+            overlayController.updateStatus("已选择区域：${rect.left}, ${rect.top}, ${rect.right}, ${rect.bottom}")
+            CoordinateCaptureManager.complete(rect)
+            delay(450)
+            stopCaptureOverlay()
+        }
+    }
+
     private fun stopCaptureOverlay() {
         capturedPoints.clear()
         activeRequest = null
@@ -98,7 +122,9 @@ class CoordinateCaptureService : LifecycleService() {
     }
 
     private fun buildIdleStatus(request: CoordinateCaptureRequest): String {
-        return if (request.pointCount == 1) {
+        return if (request.mode == CoordinateCaptureMode.RECTANGLE) {
+            "点“抓取”后拖动选择${request.stepLabels.firstOrNull() ?: "识别区域"}"
+        } else if (request.pointCount == 1) {
             "点“抓取”后选择${request.stepLabels.firstOrNull() ?: "目标点"}"
         } else {
             "点“抓取”后依次选择${request.stepLabels.joinToString("、")}"
